@@ -1,0 +1,9 @@
+HT-PD-RD-V1 BACKEND UAT DEPLOY READY
+
+Evidence before mutation:
+- Exact Script ID resolved read-only and owns existing Web App deployment: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
+- Existing deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
+- OAuth account: gpt@hatiencorp.vn
+- Diagnostic run: 32961561324 PASS
+- Backend CI run: 32961743665 PASS
+- UI deployment remains frozen until backend runtime UAT passes.
