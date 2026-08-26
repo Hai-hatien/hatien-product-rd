@@ -51,4 +51,25 @@ jobs:
       - name: Execute runtime prerequisite verifier through Apps Script Execution API
         run: |
           set -euo pipefail
-          clasp run verifyRuntimePrerequisites --nondev 2>&1 | tee /tmp/runtime-prereq.txt
+          set +e
+          OUT="$(clasp run verifyRuntimePrerequisites --nondev 2>&1)"
+          RC=$?
+          set -e
+          printf '%s\n' "$OUT" | tee /tmp/runtime-prereq.txt
+
+          if [ "$RC" -ne 0 ]; then
+            echo "RUNTIME_PREREQ_EXECUTION=FAIL clasp_exit=$RC"
+            exit "$RC"
+          fi
+
+          if printf '%s\n' "$OUT" | grep -Eqi 'Unable to run script function|permission to run the script function|NOT_AUTHORIZED|PERMISSION_DENIED|Exception:|Error:'; then
+            echo 'RUNTIME_PREREQ_EXECUTION=FAIL api_error_detected'
+            exit 1
+          fi
+
+          if ! printf '%s\n' "$OUT" | grep -Fq 'PREREQUISITES_VERIFIED'; then
+            echo 'RUNTIME_PREREQ_EXECUTION=FAIL prerequisites_not_verified'
+            exit 1
+          fi
+
+          echo 'RUNTIME_PREREQ_EXECUTION=PASS'
