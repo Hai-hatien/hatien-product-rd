@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
   APPS_SCRIPT_DEPLOYMENT_ID: 'AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
   ROOT_DIR: 'apps-script/ht-pd-rd-v1'
   CANONICAL_REPOSITORY: 'Hai-hatien/hatien-product-rd'
@@ -48,7 +48,6 @@ jobs:
           for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs appsscript.json; do
             test -f "$ROOT_DIR/$f" || { echo "Missing required backend runtime file: $f"; exit 1; }
           done
-          # P0 requires true scheduler handlers before any force push to the existing project.
           for handler in runR1Scheduled runR2Scheduled runR3Scheduled runR4Scheduled runR5Scheduled runR6Scheduled runR7Scheduled runR8Scheduled runR0DailySummary; do
             grep -R -q "function ${handler}" "$ROOT_DIR" || { echo "Missing runtime handler: $handler"; exit 1; }
           done
@@ -70,6 +69,18 @@ jobs:
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
           printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > "$ROOT_DIR/.clasp.json"
+
+      - name: Verify exact Script ID owns existing Web App deployment before mutation
+        working-directory: apps-script/ht-pd-rd-v1
+        run: |
+          set -euo pipefail
+          clasp pull >/tmp/target-pull.log
+          test -f appsscript.json
+          clasp list-deployments | tee /tmp/target-deployments.log
+          grep -F "$APPS_SCRIPT_DEPLOYMENT_ID" /tmp/target-deployments.log
+          echo "TARGET_SCRIPT_ID=$APPS_SCRIPT_ID"
+          echo "TARGET_DEPLOYMENT_ID=$APPS_SCRIPT_DEPLOYMENT_ID"
+          echo 'TARGET_OWNERSHIP_PRECHECK=PASS'
 
       - name: Push canonical source to Apps Script
         working-directory: apps-script/ht-pd-rd-v1
