@@ -1,0 +1,3 @@
+UAT UI preview requested after staging Index, Client, Candidate Detail, Executive UX, and Styles.
+Target Apps Script: 1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
+Target deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
