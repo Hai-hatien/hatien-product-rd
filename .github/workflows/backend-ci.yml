@@ -8,6 +8,8 @@ on:
       - 'apps-script/ht-pd-rd-v1/**'
       - 'tests/**'
       - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/apps-script-deploy.yml'
+      - '.github/workflows/apps-script-ui-preview.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,3 +33,5 @@ jobs:
           for f in /tmp/ht-pd-rd-js/*.js; do node --check "$f"; done
       - name: Backend behavior contracts
         run: node tests/backend_behavior.test.js
+      - name: P0 backend gate source contracts
+        run: node tests/p0_backend_gate.test.js
