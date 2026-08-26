@@ -1,0 +1,241 @@
+<style>
+  .candidate-detail-dialog { width: min(820px, calc(100vw - 24px)); }
+  .candidate-detail-dialog .candidate-detail-body { padding: 20px; }
+  .candidate-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .candidate-signal-list { display: grid; gap: 10px; margin-top: 14px; }
+  .candidate-signal { border: 1px solid var(--line); border-radius: 9px; padding: 11px; background: var(--surface-soft); }
+  .candidate-signal a { color: var(--blue); font-weight: 800; overflow-wrap: anywhere; }
+  .candidate-source-mix { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .candidate-detail-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .ai-nav { display: none; }
+  @media (max-width: 760px) {
+    .sidebar { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    .ai-nav { display: flex !important; }
+    .candidate-detail-grid { grid-template-columns: 1fr; }
+    .candidate-detail-dialog .candidate-detail-body { padding: 14px; }
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    ensureCandidateDetailUi_();
+    ensureFiveItemMobileNav_();
+  });
+
+  function ensureFiveItemMobileNav_() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+    const overview = sidebar.querySelector('[data-view="overview"]');
+    const request = sidebar.querySelector('[data-view="request"]');
+    const library = sidebar.querySelector('[data-view="library"]');
+    const approvals = sidebar.querySelector('[data-view="approvals"]');
+    if (!overview || !request || !library || !approvals) return;
+
+    let aiNav = sidebar.querySelector('.ai-nav');
+    if (!aiNav) {
+      aiNav = document.createElement('button');
+      aiNav.type = 'button';
+      aiNav.className = 'nav-item ai-nav';
+      aiNav.dataset.view = 'library';
+      aiNav.innerHTML = '<span>✦</span><b>AI đề xuất</b>';
+      aiNav.addEventListener('click', () => openLibraryTab('AI_PROPOSAL'));
+    }
+
+    sidebar.insertBefore(aiNav, request);
+    sidebar.insertBefore(request, approvals);
+    sidebar.insertBefore(approvals, library);
+  }
+
+  function ensureCandidateDetailUi_() {
+    if (document.getElementById('candidateDetailDialog')) return;
+    const dialog = document.createElement('dialog');
+    dialog.id = 'candidateDetailDialog';
+    dialog.className = 'candidate-detail-dialog';
+    dialog.innerHTML = `
+      <div class="candidate-detail-body">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">AI CANDIDATE DECISION PACK</span>
+            <h3 id="candidateDetailTitle">AI đề xuất R&D</h3>
+          </div>
+          <button type="button" class="icon-button" onclick="closeCandidateDetail()">×</button>
+        </div>
+        <div id="candidateDetailContent"></div>
+        <div class="candidate-detail-actions">
+          <button type="button" class="button secondary" onclick="closeCandidateDetail()">Đóng</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dialog);
+  }
+
+  function closeCandidateDetail() {
+    const dialog = document.getElementById('candidateDetailDialog');
+    if (dialog && dialog.open) dialog.close();
+  }
+
+  async function openCandidate(candidateId) {
+    const card = (appData && appData.candidateLibrary || []).find(item => item.candidateId === candidateId);
+    if (!card) return;
+    if (card.rdCaseId) return loadCase(card.rdCaseId);
+    if (card.rdRequestId) {
+      showViewByName('approvals');
+      return;
+    }
+    if (card.origin !== 'AI') {
+      showViewByName('library');
+      return;
+    }
+
+    ensureCandidateDetailUi_();
+    setNotice('Đang tải Decision Pack AI…');
+    try {
+      const detail = await gas('getMarketCandidateDetail', candidateId);
+      renderMarketCandidateDetail_(detail);
+      hideNotice();
+      document.getElementById('candidateDetailDialog').showModal();
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function renderMarketCandidateDetail_(detail) {
+    document.getElementById('candidateDetailTitle').textContent = detail.title || 'AI đề xuất R&D';
+    const coverage = detail.evidenceCoverage || {};
+    const mix = Array.isArray(detail.sourceMix) ? detail.sourceMix : [];
+    const missing = Array.isArray(coverage.missingSources) ? coverage.missingSources : [];
+    const signals = Array.isArray(detail.signals) ? detail.signals : [];
+
+    const mixHtml = mix.length
+      ? mix.map(item => `<span class="candidate-chip">${escapeHtml(item)}</span>`).join('')
+      : '<span class="candidate-chip">CHƯA ĐỦ ĐA NGUỒN</span>';
+    const signalHtml = signals.length
+      ? signals.map(signal => {
+          const url = safeCandidateUrl_(signal.sourceUrl);
+          return `<article class="candidate-signal">
+            <div class="candidate-meta">
+              <span class="candidate-chip">${escapeHtml(signal.sourceType || 'SOURCE')}</span>
+              <span class="candidate-chip">${escapeHtml(signal.evidenceLabel || 'CHƯA BIẾT')}</span>
+              <span class="candidate-chip">${escapeHtml(signal.confidence || 'LOW')}</span>
+            </div>
+            <strong>${escapeHtml(signal.sourceTitle || signal.sourceOrg || 'Nguồn')}</strong>
+            <p>${escapeHtml(signal.summary || '')}</p>
+            ${url ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">Mở nguồn ↗</a>` : '<span class="status-text amber">Chưa có URL nguồn</span>'}
+          </article>`;
+        }).join('')
+      : emptyState('Chưa có tín hiệu nguồn để hiển thị.');
+
+    document.getElementById('candidateDetailContent').innerHTML = `
+      <p><strong>${escapeHtml(detail.market || 'CHƯA BIẾT')}</strong> • ${escapeHtml(detail.customer || 'CHƯA BIẾT')}</p>
+      <p>${escapeHtml(detail.summary || 'CHƯA CÓ DỮ LIỆU')}</p>
+      <div class="candidate-source-mix">${mixHtml}</div>
+      <div class="candidate-detail-grid">
+        ${infoBox('WHY GO', detail.whyGo, true)}
+        ${infoBox('WHY NOT / RISK', detail.whyNot, false, true)}
+        ${infoBox('MARKET GAP', detail.marketGap)}
+        ${infoBox('LỢI THẾ HÀ TIÊN', detail.htAdvantage)}
+        ${infoBox('CHƯA BIẾT', detail.criticalUnknowns || 'CHƯA BIẾT')}
+        ${infoBox('AI KHUYẾN NGHỊ', detail.recommendation || 'RESEARCH_MORE', true)}
+        ${infoBox('BẰNG CHỨNG', `${coverage.sourcedSignals || 0}/${coverage.totalSignals || 0} tín hiệu có nguồn`)}
+        ${infoBox('NGUỒN CÒN THIẾU', missing.length ? missing.join(', ') : 'Không ghi nhận nguồn bắt buộc bị thiếu')}
+      </div>
+      <h4>Nguồn & tín hiệu</h4>
+      <div class="candidate-signal-list">${signalHtml}</div>`;
+  }
+
+  function safeCandidateUrl_(value) {
+    const url = String(value || '').trim();
+    return /^https?:\/\//i.test(url) ? url : '';
+  }
+
+  function openDecisionType_(card) {
+    if (!card || card.cardType !== 'OPEN_DECISION') return '';
+    return String(card.title || '').trim().toUpperCase();
+  }
+
+  function isSupportedOpenDecision_(card) {
+    return ['WORK_PRIORITY_SELECTION', 'FAMILY_SCOPE_CONFIRMATION', 'M0_INPUT_CONFIRMATION']
+      .includes(openDecisionType_(card));
+  }
+
+  function openDecisionDialog(index) {
+    activeDecisionCard = appData.decisionCards[index];
+    if (activeDecisionCard.cardType === 'OPEN_DECISION' && !isSupportedOpenDecision_(activeDecisionCard)) {
+      showError(new Error('Quyết định này cần mở hồ sơ chuyên môn; chưa cho phép xử lý trực tiếp trên thẻ.'));
+      activeDecisionCard = null;
+      return;
+    }
+    const form = document.getElementById('decisionForm');
+    form.reset();
+    form.elements.cardType.value = activeDecisionCard.cardType;
+    form.elements.rdRequestId.value = activeDecisionCard.rdRequestId || '';
+    form.elements.rdCaseId.value = activeDecisionCard.rdCaseId || '';
+    form.elements.gateType.value = activeDecisionCard.gateType || '';
+    document.getElementById('decisionTitle').textContent = uiStatusLabel(activeDecisionCard.title || activeDecisionCard.gateType || 'Ra quyết định');
+    const needsPriority = activeDecisionCard.cardType === 'RESEARCH_REQUEST' || openDecisionType_(activeDecisionCard) === 'WORK_PRIORITY_SELECTION';
+    document.getElementById('priorityField').classList.toggle('hidden', !needsPriority);
+    const select = document.getElementById('decisionSelect');
+    select.innerHTML = decisionOptions(activeDecisionCard)
+      .map(option => `<option value="${escapeAttr(option.value)}">${escapeHtml(option.label)}</option>`)
+      .join('');
+    document.getElementById('decisionDialog').showModal();
+  }
+
+  function decisionOptions(card) {
+    const openType = openDecisionType_(card);
+    if (openType === 'WORK_PRIORITY_SELECTION') return [{ value: 'CONFIRM_PRIORITY', label: 'Xác nhận mức ưu tiên' }];
+    if (openType === 'FAMILY_SCOPE_CONFIRMATION') return [{ value: 'CONFIRM_FAMILY', label: 'Xác nhận dòng sản phẩm hiện tại' }];
+    if (openType === 'M0_INPUT_CONFIRMATION') return [
+      { value: 'CONFIRMED_M0', label: 'Xác nhận M0 tối thiểu' },
+      { value: 'RESEARCH_MORE', label: 'Bổ sung dữ liệu M0' },
+      { value: 'HOLD', label: 'Giữ theo dõi' }
+    ];
+    if (card.cardType === 'RESEARCH_REQUEST') return [
+      { value: 'RESEARCH_APPROVED', label: 'Duyệt nghiên cứu' },
+      { value: 'NEED_MORE_INFO', label: 'Yêu cầu bổ sung' },
+      { value: 'HOLD', label: 'Giữ theo dõi' },
+      { value: 'REJECTED', label: 'Dừng' }
+    ];
+    if (card.gateType === 'M4_GATE') return [
+      { value: 'GO_CONCEPT', label: 'Duyệt đi Concept' },
+      { value: 'RESEARCH_MORE', label: 'Bổ sung nghiên cứu' },
+      { value: 'HOLD', label: 'Giữ theo dõi' },
+      { value: 'STOP', label: 'Dừng' }
+    ];
+    if (card.gateType === 'FINAL_HANDOVER') return [
+      { value: 'APPROVED_FOR_PRODUCT_MASTER_REVIEW', label: 'Duyệt bàn giao cuối' },
+      { value: 'GATE_NEED_MORE_EVIDENCE', label: 'Yêu cầu bổ sung' },
+      { value: 'GATE_REJECTED', label: 'Dừng' }
+    ];
+    return [
+      { value: 'GATE_APPROVED', label: 'Làm tiếp' },
+      { value: 'GATE_NEED_MORE_EVIDENCE', label: 'Bổ sung bằng chứng' },
+      { value: 'GATE_HOLD_RECOMMENDED', label: 'Giữ theo dõi' },
+      { value: 'GATE_REJECTED', label: 'Dừng' }
+    ];
+  }
+
+  async function confirmDecision(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    setNotice('Đang ghi quyết định…');
+    try {
+      let result;
+      if (payload.cardType === 'RESEARCH_REQUEST') {
+        if (payload.priority) await gas('setRequestPriority', payload.rdRequestId, payload.priority, payload.reason || '');
+        result = await gas('approveResearch', payload.rdRequestId, payload.decision, payload.reason || '');
+      } else if (payload.cardType === 'OPEN_DECISION') {
+        if (!activeDecisionCard || !isSupportedOpenDecision_(activeDecisionCard)) throw new Error('Quyết định OPEN không hợp lệ hoặc đã thay đổi.');
+        if (openDecisionType_(activeDecisionCard) === 'WORK_PRIORITY_SELECTION' && !payload.priority) throw new Error('Cần chọn mức ưu tiên P0-P3.');
+        result = await gas('resolveOpenDecision', { decisionId: activeDecisionCard.id, decision: payload.decision, priority: payload.priority, reason: payload.reason });
+      } else {
+        result = await gas('submitGateDecision', { rdCaseId: payload.rdCaseId, gateType: payload.gateType, decision: payload.decision, scope: payload.scope, costCap: payload.costCap, dueDate: payload.dueDate, requiredEvidence: payload.requiredEvidence, reason: payload.reason });
+      }
+      closeDecisionDialog();
+      await reloadData();
+      setNotice('Đã ghi quyết định.');
+      showViewByName('approvals');
+    } catch (error) {
+      showError(error);
+    }
+  }
+</script>
