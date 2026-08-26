@@ -1,0 +1,33 @@
+name: HT-PD-RD Backend CI
+
+on:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - 'apps-script/ht-pd-rd-v1/**'
+      - 'tests/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apps Script syntax preflight
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ht-pd-rd-js
+          for f in apps-script/ht-pd-rd-v1/*.gs; do
+            cp "$f" "/tmp/ht-pd-rd-js/$(basename "${f%.gs}").js"
+          done
+          for f in /tmp/ht-pd-rd-js/*.js; do node --check "$f"; done
+      - name: Backend behavior contracts
+        run: node tests/backend_behavior.test.js
