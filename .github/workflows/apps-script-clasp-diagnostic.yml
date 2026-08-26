@@ -44,10 +44,6 @@ jobs:
           const arr=Array.isArray(raw)?raw:(raw.scripts||raw.projects||[]);
           console.log(String(arr[0]?.scriptId||arr[0]?.id||''));
           console.error('VISIBLE_SCRIPT_COUNT='+arr.length);
-          for (const x of arr) {
-            const title=String(x.title||x.name||'').replace(/[\r\n]/g,' ');
-            if (title) console.error('VISIBLE_TITLE='+title);
-          }
           NODE
           VISIBLE_ID="$(cat /tmp/visible-id)"
           test -n "$VISIBLE_ID" || { echo 'NO_VISIBLE_SCRIPTS'; exit 2; }
@@ -68,18 +64,25 @@ jobs:
           printf '%s\n' "$OUT" | grep -F "$TARGET_DEPLOYMENT"
           echo "EXACT_TARGET_SCRIPT_ID=$TARGET"
           echo 'TARGET_RESOLUTION=EXACT_DEPLOYMENT_OWNER_CONFIRMED'
-      - name: Inspect target runtime file manifest and drift read-only
+      - name: Inspect target runtime manifest and callable surface read-only
         run: |
           set -euo pipefail
           cd /tmp/target-script
           echo 'REMOTE_FILE_MANIFEST_BEGIN'
           find . -maxdepth 1 -type f ! -name '.clasp.json' -printf '%f\n' | sort
           echo 'REMOTE_FILE_MANIFEST_END'
-          echo "REMOTE_GS_COUNT=$(find . -maxdepth 1 -type f -name '*.gs' | wc -l | tr -d ' ')"
+          echo "REMOTE_JS_COUNT=$(find . -maxdepth 1 -type f -name '*.js' | wc -l | tr -d ' ')"
           echo "REMOTE_HTML_COUNT=$(find . -maxdepth 1 -type f -name '*.html' | wc -l | tr -d ' ')"
-          for f in Code.gs Index.html Client.html Styles.html appsscript.json; do
+          for f in Code.js Index.html Client.html Styles.html appsscript.json; do
             if [ -f "$f" ]; then echo "REMOTE_HAS_${f//[^A-Za-z0-9]/_}=YES"; else echo "REMOTE_HAS_${f//[^A-Za-z0-9]/_}=NO"; fi
           done
-          if grep -R -q --include='*.gs' 'runDailyRdOrchestrator' .; then echo 'REMOTE_LEGACY_ORCHESTRATOR=YES'; else echo 'REMOTE_LEGACY_ORCHESTRATOR=NO'; fi
-          if grep -R -q --include='*.gs' 'OPENAI_API_KEY\|api.openai.com' .; then echo 'REMOTE_OPENAI_RUNTIME=YES'; else echo 'REMOTE_OPENAI_RUNTIME=NO'; fi
-          if grep -R -q --include='*.gs' 'function doGet' .; then echo 'REMOTE_DOGET=YES'; else echo 'REMOTE_DOGET=NO'; fi
+          if grep -R -q --include='*.js' 'runDailyRdOrchestrator' .; then echo 'REMOTE_LEGACY_ORCHESTRATOR=YES'; else echo 'REMOTE_LEGACY_ORCHESTRATOR=NO'; fi
+          if grep -R -q --include='*.js' 'OPENAI_API_KEY\|api.openai.com' .; then echo 'REMOTE_OPENAI_RUNTIME=YES'; else echo 'REMOTE_OPENAI_RUNTIME=NO'; fi
+          if grep -R -q --include='*.js' 'function doGet' .; then echo 'REMOTE_DOGET=YES'; else echo 'REMOTE_DOGET=NO'; fi
+          echo 'REMOTE_TOP_LEVEL_FUNCTIONS_BEGIN'
+          for f in *.js; do
+            [ -f "$f" ] || continue
+            printf '%s:' "$f"
+            grep -Eo '^function[[:space:]]+[A-Za-z0-9_$]+' "$f" | awk '{print $2}' | paste -sd, - || true
+          done
+          echo 'REMOTE_TOP_LEVEL_FUNCTIONS_END'
