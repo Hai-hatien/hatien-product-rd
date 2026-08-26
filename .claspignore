@@ -1,0 +1,4 @@
+**/**
+!apps-script/ht-pd-rd-v1/**/*.gs
+!apps-script/ht-pd-rd-v1/**/*.html
+!apps-script/ht-pd-rd-v1/appsscript.json
