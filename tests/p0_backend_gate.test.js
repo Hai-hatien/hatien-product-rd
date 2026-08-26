@@ -29,11 +29,12 @@ mustContain('Config.gs', [
 mustNotContain('Config.gs', ['OPENAI_API_KEY', 'api.openai.com']);
 
 mustContain('WorkflowService.gs', [
-  "subflowId: 'R1.1'",
-  "subflowId: 'R2.1'",
-  "subflowId: 'R3.1'",
-  "dependsOn: 'M0:CONFIRMED'",
-  "Chưa đủ bằng chứng để GO_CONCEPT"
+  "'R1.1': 'M0:CONFIRMED'",
+  "'R2.1': 'M0:CONFIRMED'",
+  "'R3.1': 'M0:CONFIRMED'",
+  "'R4.1': 'R1.5|R2.6|R3.6|GATE:M4'",
+  'releaseResearchFanoutAfterM0_',
+  'Chưa đủ bằng chứng để GO_CONCEPT'
 ]);
 
 mustContain('Core.gs', [
@@ -53,7 +54,7 @@ mustContain('AuditIntegrityService.gs', [
 
 mustContain('FlowScheduleService.gs', [
   "['R1', 'R2', 'R3']",
-  "M0:CONFIRMED",
+  'M0:CONFIRMED',
   'triggerRuntimeSnapshot_',
   'PENDING_INSTALL',
   'INSTALLED'
@@ -72,6 +73,21 @@ mustContain('RuntimeConfigService.gs', [
   'verifyGeminiRuntime_',
   'verifyAppsScriptCoordinate_',
   'verifyRuntimePrerequisites'
+]);
+
+mustContain('AutomationService.gs', [
+  'runScheduledFlowProbe_',
+  "runR1Scheduled()",
+  "runR2Scheduled()",
+  "runR3Scheduled()",
+  "runR4Scheduled()",
+  "runR5Scheduled()",
+  "runR6Scheduled()",
+  "runR7Scheduled()",
+  "runR8Scheduled()",
+  'runR0DailySummary()',
+  'READY_WORK_DETECTED',
+  'NO_READY_WORK'
 ]);
 
 mustContain('UatBackendTestService.gs', [
