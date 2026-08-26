@@ -1,0 +1,109 @@
+name: HT-PD-RD UAT UI Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - '.github/workflows/apps-script-ui-preview.yml'
+      - 'deploy/uat-ui-preview-trigger.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ht-pd-rd-uat-ui-preview
+  cancel-in-progress: false
+
+env:
+  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+  APPS_SCRIPT_DEPLOYMENT_ID: 'AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
+
+jobs:
+  deploy-ui-preview:
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Checkout staged UI
+        uses: actions/checkout@v4
+        with:
+          ref: backend/v1.3-hardening
+
+      - name: Validate staged UI files
+        run: |
+          set -euo pipefail
+          for f in Index.html Client.html ClientCandidateDetail.html ExecutiveUx.html Styles.html; do
+            test -f "uat-ui-preview/$f" || { echo "Missing staged UI file: $f"; exit 1; }
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pinned clasp
+        run: npm install --global '@google/clasp@3.4.0'
+
+      - name: Load Google OAuth credential
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON; no Apps Script mutation performed.'; exit 1; }
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+
+      - name: Pull current Apps Script runtime source
+        run: |
+          set -euo pipefail
+          mkdir -p remote-script
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > remote-script/.clasp.json
+          cd remote-script
+          clasp pull
+          test -f appsscript.json || { echo 'Remote Apps Script pull did not return appsscript.json.'; exit 1; }
+
+      - name: Overlay latest UAT UI only
+        run: |
+          set -euo pipefail
+          cp uat-ui-preview/Index.html remote-script/Index.html
+          cp uat-ui-preview/Client.html remote-script/Client.html
+          cp uat-ui-preview/ClientCandidateDetail.html remote-script/ClientCandidateDetail.html
+          cp uat-ui-preview/ExecutiveUx.html remote-script/ExecutiveUx.html
+          cp uat-ui-preview/Styles.html remote-script/Styles.html
+          echo 'Overlay scope:'
+          printf '%s\n' Index.html Client.html ClientCandidateDetail.html ExecutiveUx.html Styles.html
+
+      - name: Push UI overlay while preserving pulled backend
+        working-directory: remote-script
+        run: clasp push --force
+
+      - name: Create immutable Apps Script version
+        id: version
+        working-directory: remote-script
+        run: |
+          set -euo pipefail
+          OUT="$(clasp create-version "HT-PD-RD UAT UI preview ${GITHUB_SHA}" 2>&1)"
+          echo "$OUT"
+          VERSION="$(printf '%s' "$OUT" | grep -Eo '[0-9]+' | tail -1)"
+          test -n "$VERSION" || { echo 'Could not parse Apps Script version number.'; exit 1; }
+          echo "number=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update existing Web App deployment
+        working-directory: remote-script
+        run: |
+          set -euo pipefail
+          clasp create-deployment \
+            --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" \
+            --versionNumber "${{ steps.version.outputs.number }}" \
+            --description "HT-PD-RD UAT UI preview ${GITHUB_SHA}"
+
+      - name: Verify deployment
+        working-directory: remote-script
+        run: |
+          set -euo pipefail
+          clasp list-deployments | tee deployments.txt
+          grep -F "$APPS_SCRIPT_DEPLOYMENT_ID" deployments.txt
+          echo "WEB_APP=https://script.google.com/macros/s/${APPS_SCRIPT_DEPLOYMENT_ID}/exec"
+          echo "UI_PREVIEW_SHA=$GITHUB_SHA"
+          echo "APPS_SCRIPT_VERSION=${{ steps.version.outputs.number }}"
