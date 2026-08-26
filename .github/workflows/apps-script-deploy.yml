@@ -1,43 +1,57 @@
-name: HT-PD-RD UAT UI Preview Deploy
+name: HT-PD-RD Canonical Backend UAT Deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - backend/v1.3-hardening
-    paths:
-      - '.github/workflows/apps-script-deploy.yml'
-      - 'deploy/uat-ui-preview-trigger.txt'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ht-pd-rd-apps-script-uat-preview
+  group: ht-pd-rd-canonical-backend-uat
   cancel-in-progress: false
 
 env:
   APPS_SCRIPT_ID: '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
   APPS_SCRIPT_DEPLOYMENT_ID: 'AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
-  SOURCE_REPOSITORY: 'Hai-hatien/hatien-digital-platform'
-  SOURCE_REF: '8f16a67d21d3b3cf055e15f36903a19d56bcade4'
-  ROOT_DIR: 'legacy-source/apps-script/ht-pd-rd-v1'
+  ROOT_DIR: 'apps-script/ht-pd-rd-v1'
+  CANONICAL_REPOSITORY: 'Hai-hatien/hatien-product-rd'
+  CANONICAL_BRANCH: 'backend/v1.3-hardening'
 
 jobs:
-  deploy-uat-ui-preview:
+  deploy-backend-uat:
     runs-on: ubuntu-latest
     environment: uat
     steps:
-      - name: Checkout deploy controller
-        uses: actions/checkout@v4
-
-      - name: Checkout exact HT-PD-RD UI source
+      - name: Checkout canonical source only
         uses: actions/checkout@v4
         with:
-          repository: Hai-hatien/hatien-digital-platform
-          ref: 8f16a67d21d3b3cf055e15f36903a19d56bcade4
-          path: legacy-source
+          ref: backend/v1.3-hardening
           persist-credentials: false
+
+      - name: Enforce P0 backend gate and canonical source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "$CANONICAL_REPOSITORY"
+          test "$GITHUB_REF_NAME" = "$CANONICAL_BRANCH"
+          if grep -R --line-number --fixed-strings 'Hai-hatien/hatien-digital-platform' apps-script/ht-pd-rd-v1 .github/workflows/apps-script-deploy.yml; then
+            echo 'Legacy hatien-digital-platform runtime source is forbidden.'
+            exit 1
+          fi
+          test -f .backend-uat-deploy-ready || {
+            echo 'P0 gate closed: .backend-uat-deploy-ready is absent. No Apps Script push will occur.'
+            exit 1
+          }
+
+      - name: Validate backend runtime package completeness
+        run: |
+          set -euo pipefail
+          for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs appsscript.json; do
+            test -f "$ROOT_DIR/$f" || { echo "Missing required backend runtime file: $f"; exit 1; }
+          done
+          # P0 requires true scheduler handlers before any force push to the existing project.
+          for handler in runR1Scheduled runR2Scheduled runR3Scheduled runR4Scheduled runR5Scheduled runR6Scheduled runR7Scheduled runR8Scheduled runR0DailySummary; do
+            grep -R -q "function ${handler}" "$ROOT_DIR" || { echo "Missing runtime handler: $handler"; exit 1; }
+          done
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -47,56 +61,45 @@ jobs:
       - name: Install pinned clasp
         run: npm install --global '@google/clasp@3.4.0'
 
-      - name: Fail closed if OAuth credential is missing
+      - name: Load OAuth credential fail-closed
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
         run: |
           set -euo pipefail
-          test -n "${CLASPRC_JSON:-}" || {
-            echo 'Missing required repository/environment secret: CLASPRC_JSON'
-            exit 1
-          }
+          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON; no push.'; exit 1; }
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > "$ROOT_DIR/.clasp.json"
 
-      - name: Validate exact UAT source package
-        run: |
-          set -euo pipefail
-          test -f "${ROOT_DIR}/appsscript.json"
-          for f in Code.gs Config.gs Core.gs AuthService.gs RequestService.gs WorkflowService.gs DashboardService.gs Index.html Client.html ExecutiveUx.html ClientCandidateDetail.html Styles.html; do
-            test -f "${ROOT_DIR}/${f}" || { echo "Missing required runtime file: ${f}"; exit 1; }
-          done
-          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > "${ROOT_DIR}/.clasp.json"
-
-      - name: Push exact source to Apps Script
-        working-directory: legacy-source/apps-script/ht-pd-rd-v1
+      - name: Push canonical source to Apps Script
+        working-directory: apps-script/ht-pd-rd-v1
         run: clasp push --force
 
       - name: Create immutable Apps Script version
         id: version
-        working-directory: legacy-source/apps-script/ht-pd-rd-v1
+        working-directory: apps-script/ht-pd-rd-v1
         run: |
           set -euo pipefail
-          OUT="$(clasp create-version "HT-PD-RD UAT UI preview 8f16a67d" 2>&1)"
+          OUT="$(clasp create-version "HT-PD-RD canonical backend ${GITHUB_SHA}" 2>&1)"
           echo "$OUT"
           VERSION="$(printf '%s' "$OUT" | grep -Eo '[0-9]+' | tail -1)"
-          test -n "$VERSION" || { echo 'Could not parse Apps Script version number.'; exit 1; }
+          test -n "$VERSION" || { echo 'Could not parse Apps Script version.'; exit 1; }
           echo "number=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Update existing Web App deployment
-        working-directory: legacy-source/apps-script/ht-pd-rd-v1
+      - name: Update existing UAT deployment
+        working-directory: apps-script/ht-pd-rd-v1
         run: |
           set -euo pipefail
           clasp create-deployment \
             --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" \
             --versionNumber "${{ steps.version.outputs.number }}" \
-            --description "HT-PD-RD UAT UI preview source 8f16a67d"
+            --description "HT-PD-RD canonical backend ${GITHUB_SHA}"
 
       - name: Verify deployment coordinate
-        working-directory: legacy-source/apps-script/ht-pd-rd-v1
+        working-directory: apps-script/ht-pd-rd-v1
         run: |
           set -euo pipefail
           clasp list-deployments | tee deployments.txt
           grep -F "$APPS_SCRIPT_DEPLOYMENT_ID" deployments.txt
-          echo "SOURCE_REF=$SOURCE_REF"
-          echo "WEB_APP=https://script.google.com/macros/s/${APPS_SCRIPT_DEPLOYMENT_ID}/exec"
+          echo "CANONICAL_SOURCE_SHA=$GITHUB_SHA"
+          echo "APPS_SCRIPT_VERSION=${{ steps.version.outputs.number }}"
