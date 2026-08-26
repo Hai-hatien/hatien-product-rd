@@ -1,0 +1,497 @@
+<script>
+  let appData = null;
+  let activeDecisionCard = null;
+  let activeCandidateTab = 'AI_PROPOSAL';
+
+  document.addEventListener('DOMContentLoaded', reloadData);
+
+  function gas(method, ...args) {
+    return new Promise((resolve, reject) => {
+      const runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject);
+      runner[method](...args);
+    });
+  }
+
+  async function reloadData() {
+    setNotice('Đang tải dữ liệu…');
+    try {
+      const data = await gas('getBootstrapData');
+      renderApp(data);
+      hideNotice();
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function renderApp(data) {
+    appData = data;
+    document.getElementById('subtitle').textContent =
+      `R&D sản phẩm • ${data.actor.email || 'Chưa xác định người dùng'}`;
+
+    if (data.restricted) {
+      document.querySelector('.content').innerHTML = `<div class="notice error">${escapeHtml(data.message)}</div>`;
+      return;
+    }
+
+    const permissions = data.actor.permissions || {};
+    document.getElementById('techNav').classList.toggle('hidden', !Boolean(permissions.technicalOperate));
+    document.getElementById('requestForm').querySelectorAll('input,select,textarea,button')
+      .forEach(el => el.disabled = !Boolean(permissions.createRequest));
+
+    renderRuntime(data.runtime || {});
+    renderKpis(data.kpis || {});
+    renderDecisions(data.decisionCards || []);
+    renderCandidates(data.candidateLibrary || []);
+    renderCases(data.cases || []);
+    renderEvidence(data.evidence || []);
+    renderWeekly(data.weeklyPack || {});
+  }
+
+  function renderRuntime(runtime) {
+    const badge = document.getElementById('runtimeBadge');
+    const ready = Boolean(runtime.triggerInstalled && runtime.aiConfigured);
+    badge.className = `badge ${ready ? '' : 'warn'}`;
+    badge.textContent = ready ? 'Hệ thống sẵn sàng' : 'Hệ thống chưa đủ';
+    document.getElementById('runtimeSummary').innerHTML = `
+      <p><strong>Lịch nghiên cứu:</strong> ${escapeHtml(runtime.schedule || '—')}</p>
+      <p><strong>Tự động:</strong> <span class="status-text ${runtime.triggerInstalled ? 'green' : 'red'}">${runtime.triggerInstalled ? 'Đã cài' : 'Chưa cài'}</span></p>
+      <p><strong>AI:</strong> <span class="status-text ${runtime.aiConfigured ? 'green' : 'red'}">${runtime.aiConfigured ? 'Đã cấu hình' : 'Chưa cấu hình'}</span></p>
+      <p><strong>Lần chạy cuối:</strong> ${escapeHtml(runtime.lastDailyRunAt || 'CHƯA CÓ')}</p>
+    `;
+  }
+
+  function renderKpis(kpis) {
+    const cards = [
+      ['Cần duyệt', kpis.openDecisionCount || 0, 'Việc chờ quyết định', 'red'],
+      ['Blocker P0/P1', kpis.blockerP0P1Count || 0, 'Phải gỡ trước', 'amber'],
+      ['Độ phủ bằng chứng', valueOrDash(kpis.evidenceCoverage, '%'), 'Hồ sơ có bằng chứng', 'green'],
+      ['Đang R&D', kpis.activeCaseCount || 0, 'Hồ sơ đang chạy', 'green']
+    ];
+    document.getElementById('kpiCards').innerHTML = cards.map(card => `
+      <article class="kpi-card ${card[3]}">
+        <div class="label">${escapeHtml(card[0])}</div>
+        <div class="value">${escapeHtml(String(card[1]))}</div>
+        <div class="hint">${escapeHtml(card[2])}</div>
+      </article>`).join('');
+
+    const detailCards = [
+      ['Hồ sơ đang chạy', kpis.activeCaseCount || 0, 'Không tính hồ sơ dừng/bàn giao'],
+      ['Task sẵn sàng', kpis.readyTaskCount || 0, 'Có thể xử lý tiếp'],
+      ['Blocker', kpis.blockerCount || 0, 'Đang chờ dữ liệu/phụ thuộc'],
+      ['Truy xuất thử nghiệm', valueOrDash(kpis.traceableTestRate, '%'), 'Revision + run + evidence'],
+      ['Claim thiếu bằng chứng', kpis.claimsMissingEvidence || 0, 'Mục tiêu phải bằng 0'],
+      ['Bàn giao', kpis.handoverCount || 0, 'Đã duyệt review Product Master']
+    ];
+    document.getElementById('kpiDetailCards').innerHTML = detailCards.map((card, index) => `
+      <article class="kpi-card ${index === 4 && Number(card[1]) > 0 ? 'red' : ''}">
+        <div class="label">${escapeHtml(card[0])}</div>
+        <div class="value">${escapeHtml(String(card[1]))}</div>
+        <div class="hint">${escapeHtml(card[2])}</div>
+      </article>`).join('');
+  }
+
+  function renderDecisions(cards) {
+    const overview = cards.slice(0, 4);
+    document.getElementById('overviewDecisions').innerHTML = overview.length
+      ? overview.map(renderDecisionListItem).join('')
+      : emptyState('Không có việc cần quyết định.');
+    document.getElementById('approvalCards').innerHTML = cards.length
+      ? cards.map(renderDecisionCard).join('')
+      : emptyState('Không có việc cần duyệt.');
+  }
+
+  function renderDecisionListItem(card) {
+    const ready = card.status === 'GATE_READY_FOR_REVIEW' || card.cardType === 'RESEARCH_REQUEST';
+    return `
+      <article class="item-card ${ready ? 'ready' : 'blocked'}">
+        <div>
+          <h4>${escapeHtml(card.title)}</h4>
+          <p>${escapeHtml(card.subtitle || '')} • ${escapeHtml(uiStatusLabel(card.status))}</p>
+        </div>
+        <button class="button" onclick="showViewByName('approvals')">Xem quyết định</button>
+      </article>`;
+  }
+
+  function renderDecisionCard(card) {
+    const index = appData.decisionCards.indexOf(card);
+    const buttonDisabled = !card.canApprove;
+    const statusClass = card.status === 'GATE_READY_FOR_REVIEW' || card.cardType === 'RESEARCH_REQUEST' ? '' : 'warn';
+    return `
+      <article class="decision-card">
+        <div class="top">
+          <div>
+            <span class="eyebrow">${escapeHtml(card.gateLabel || card.subtitle || 'DECISION')}</span>
+            <h3>${escapeHtml(card.title)}</h3>
+            <p>${escapeHtml(card.customer || card.subtitle || '')}</p>
+          </div>
+          <span class="badge ${statusClass}">${escapeHtml(uiStatusLabel(card.status))}</span>
+        </div>
+        <div class="six-boxes">
+          ${infoBox('Khách hàng + pain', card.problem)}
+          ${infoBox('WHY GO', card.whyGo || card.newLearning, true)}
+          ${infoBox('WHY NOT / RISK', card.whyNot || 'CHƯA PHÁT HIỆN', false, true)}
+          ${infoBox('Bằng chứng', card.evidence)}
+          ${infoBox('CHƯA BIẾT', card.criticalUnknowns || 'CHƯA CÓ MỤC TRỌNG YẾU')}
+          ${infoBox('Khuyến nghị', card.recommendation, true)}
+          ${infoBox('Chi phí bước tiếp theo', card.nextCost)}
+          ${infoBox('Hạn cần quyết định', card.dueDate || 'CHƯA ẤN ĐỊNH')}
+        </div>
+        <div class="form-actions">
+          <button class="button secondary" onclick="openCardCase(${index})">Mở hồ sơ</button>
+          <button class="button" ${buttonDisabled ? 'disabled' : ''} onclick="openDecisionDialog(${index})">Ra quyết định</button>
+        </div>
+      </article>`;
+  }
+
+  function infoBox(label, value, recommend = false, risk = false) {
+    const classes = ['info-box'];
+    if (recommend) classes.push('recommend');
+    if (risk) classes.push('risk');
+    return `<div class="${classes.join(' ')}"><strong>${escapeHtml(label)}</strong>${escapeHtml(value || 'CHƯA CÓ DỮ LIỆU')}</div>`;
+  }
+
+  function renderCandidates(cards) {
+    const counts = {
+      AI_PROPOSAL: cards.filter(card => card.statusGroup === 'AI_PROPOSAL').length,
+      IN_RD: cards.filter(card => card.statusGroup === 'IN_RD').length,
+      WAITING_APPROVAL: cards.filter(card => card.statusGroup === 'WAITING_APPROVAL').length,
+      HANDED_OVER: cards.filter(card => card.statusGroup === 'HANDED_OVER').length
+    };
+    document.getElementById('count-ai').textContent = counts.AI_PROPOSAL;
+    document.getElementById('count-rd').textContent = counts.IN_RD;
+    document.getElementById('count-wait').textContent = counts.WAITING_APPROVAL;
+    document.getElementById('count-done').textContent = counts.HANDED_OVER;
+
+    const ai = cards.filter(card => card.statusGroup === 'AI_PROPOSAL').slice(0, 3);
+    document.getElementById('overviewAiCandidates').innerHTML = ai.length
+      ? ai.map(renderCandidateCard).join('')
+      : emptyState('Chưa có đề xuất AI đủ điều kiện trình lên.');
+    renderCandidateTab();
+  }
+
+  function renderCandidateTab() {
+    if (!appData) return;
+    const cards = (appData.candidateLibrary || []).filter(card => card.statusGroup === activeCandidateTab);
+    document.getElementById('candidateLibrary').innerHTML = cards.length
+      ? cards.map(renderCandidateCard).join('')
+      : emptyState(candidateEmptyText(activeCandidateTab));
+  }
+
+  function renderCandidateCard(card) {
+    const sourceLabel = card.origin === 'AI' ? 'AI đề xuất' : 'Yêu cầu nội bộ';
+    const stageLabel = card.stageLabel || uiStatusLabel(card.stage || card.statusGroup);
+    return `
+      <article class="candidate-card">
+        <div>
+          <div class="candidate-meta">
+            <span class="candidate-chip">${escapeHtml(sourceLabel)}</span>
+            <span class="candidate-chip">${escapeHtml(stageLabel)}</span>
+            ${card.productScope ? `<span class="candidate-chip">${escapeHtml(card.productScope)}</span>` : ''}
+          </div>
+          <h4>${escapeHtml(card.title)}</h4>
+          <p>${escapeHtml(card.customer || 'Khách hàng: CHƯA BIẾT')}</p>
+          <div class="candidate-value"><strong>Pain:</strong> ${escapeHtml(card.pain || 'CHƯA BIẾT')}</div>
+          <div class="candidate-value"><strong>Giá trị / tín hiệu:</strong> ${escapeHtml(card.value || card.learning || 'CHƯA CÓ DỮ LIỆU ĐỦ')}</div>
+          <div class="candidate-value"><strong>Bằng chứng:</strong> ${escapeHtml(String(card.evidenceCount || 0))} nguồn/mục</div>
+        </div>
+        <button class="button secondary" onclick="openCandidate('${escapeAttr(card.candidateId)}')">Xem chi tiết</button>
+      </article>`;
+  }
+
+  function setCandidateTab(tab, button) {
+    activeCandidateTab = tab;
+    document.querySelectorAll('.candidate-tab').forEach(el => el.classList.remove('active'));
+    if (button) button.classList.add('active');
+    renderCandidateTab();
+  }
+
+  function openLibraryTab(tab) {
+    activeCandidateTab = tab;
+    showViewByName('library');
+    const button = document.querySelector(`.candidate-tab[data-candidate-tab="${tab}"]`);
+    setCandidateTab(tab, button);
+  }
+
+  function openCandidate(candidateId) {
+    const card = (appData.candidateLibrary || []).find(item => item.candidateId === candidateId);
+    if (!card) return;
+    if (card.rdCaseId) return loadCase(card.rdCaseId);
+    if (card.rdRequestId) {
+      showViewByName('approvals');
+      return;
+    }
+    showViewByName('library');
+  }
+
+  function candidateEmptyText(tab) {
+    if (tab === 'AI_PROPOSAL') return 'Chưa có đề xuất AI đủ bằng chứng.';
+    if (tab === 'IN_RD') return 'Chưa có sản phẩm đang R&D.';
+    if (tab === 'WAITING_APPROVAL') return 'Không có sản phẩm đang chờ duyệt.';
+    if (tab === 'HANDED_OVER') return 'Chưa có sản phẩm bàn giao.';
+    return 'Chưa có dữ liệu.';
+  }
+
+  function renderCases(cases) {
+    document.getElementById('caseList').innerHTML = cases.length
+      ? cases.map(row => `
+        <article class="item-card">
+          <div>
+            <h4>${escapeHtml(row.CASE_TITLE || row.RD_CASE_ID)}</h4>
+            <p>${escapeHtml(uiStatusLabel(row.CURRENT_STAGE))} • ${escapeHtml(uiStatusLabel(row.CASE_STATUS))} • ${escapeHtml(row.WORK_PRIORITY || 'Chưa chọn ưu tiên')}</p>
+          </div>
+          <button class="button" onclick="loadCase('${escapeAttr(row.RD_CASE_ID)}')">Mở hồ sơ</button>
+        </article>`).join('')
+      : emptyState('Chưa có hồ sơ R&D.');
+  }
+
+  async function loadCase(caseId) {
+    setNotice('Đang tải hồ sơ…');
+    try {
+      const detail = await gas('getCaseDetail', caseId);
+      const box = document.getElementById('caseDetail');
+      box.classList.remove('hidden');
+      box.innerHTML = `
+        <div class="panel-heading"><h3>${escapeHtml(detail.caseRecord.CASE_TITLE || detail.caseRecord.RD_CASE_ID)}</h3></div>
+        <div class="six-boxes">
+          ${infoBox('Giai đoạn', uiStatusLabel(detail.caseRecord.CURRENT_STAGE))}
+          ${infoBox('Trạng thái', uiStatusLabel(detail.caseRecord.CASE_STATUS))}
+          ${infoBox('Nghiên cứu thị trường', String(detail.market.length) + ' mục')}
+          ${infoBox('Khách hàng / use case', String(detail.voc.length) + ' mục')}
+          ${infoBox('Benchmark', String(detail.benchmark.length) + ' mục')}
+          ${infoBox('Bằng chứng', String(detail.evidence.length) + ' tệp/mục')}
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Bước</th><th>Việc</th><th>Trạng thái</th><th>Phụ trách</th></tr></thead>
+          <tbody>${detail.tasks.map(task => `<tr><td>${escapeHtml(task.SUBFLOW_ID)}</td><td>${escapeHtml(task.TASK_TITLE)}</td><td>${escapeHtml(uiStatusLabel(task.STATUS))}</td><td>${escapeHtml(task.OWNER)}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+      showViewByName('cases');
+      hideNotice();
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function openCardCase(index) {
+    const card = appData.decisionCards[index];
+    if (card.rdCaseId) loadCase(card.rdCaseId);
+    else if (card.rdRequestId) showViewByName('request');
+  }
+
+  function renderEvidence(rows) {
+    document.getElementById('evidenceBody').innerHTML = rows.length
+      ? rows.map(row => `
+        <tr>
+          <td>${escapeHtml(row.EVIDENCE_ID)}</td>
+          <td>${escapeHtml(row.RD_CASE_ID)}</td>
+          <td>${escapeHtml(row.REVISION_ID || '—')}</td>
+          <td>${escapeHtml(row.TEST_RUN_ID || '—')}</td>
+          <td>${escapeHtml(row.EVIDENCE_LABEL)}</td>
+          <td>${row.DRIVE_URL ? `<a href="${escapeAttr(row.DRIVE_URL)}" target="_blank" rel="noopener">Mở tệp</a>` : escapeHtml(row.DRIVE_FILE_ID || 'CHƯA CÓ')}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6">CHƯA CÓ DỮ LIỆU</td></tr>';
+  }
+
+  function renderWeekly(pack) {
+    document.getElementById('weeklySummary').innerHTML = (pack.summary || []).map(line => `<div class="summary-line">${escapeHtml(line)}</div>`).join('');
+  }
+
+  async function submitRequest(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    setNotice('Đang lưu yêu cầu…');
+    try {
+      const result = await gas('createRdRequest', payload);
+      form.reset();
+      await reloadData();
+      setNotice(`Đã tạo yêu cầu ${result.requestId}.`);
+      showViewByName('approvals');
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function openDecisionDialog(index) {
+    activeDecisionCard = appData.decisionCards[index];
+    const form = document.getElementById('decisionForm');
+    form.reset();
+    form.elements.cardType.value = activeDecisionCard.cardType;
+    form.elements.rdRequestId.value = activeDecisionCard.rdRequestId || '';
+    form.elements.rdCaseId.value = activeDecisionCard.rdCaseId || '';
+    form.elements.gateType.value = activeDecisionCard.gateType || '';
+    document.getElementById('decisionTitle').textContent = activeDecisionCard.title;
+    document.getElementById('priorityField').classList.toggle('hidden', activeDecisionCard.cardType !== 'RESEARCH_REQUEST');
+    const select = document.getElementById('decisionSelect');
+    select.innerHTML = decisionOptions(activeDecisionCard).map(option => `<option value="${escapeAttr(option.value)}">${escapeHtml(option.label)}</option>`).join('');
+    document.getElementById('decisionDialog').showModal();
+  }
+
+  function decisionOptions(card) {
+    if (card.cardType === 'RESEARCH_REQUEST') return [
+      { value: 'RESEARCH_APPROVED', label: 'Duyệt nghiên cứu' },
+      { value: 'NEED_MORE_INFO', label: 'Yêu cầu bổ sung' },
+      { value: 'HOLD', label: 'Giữ theo dõi' },
+      { value: 'REJECTED', label: 'Dừng' }
+    ];
+    if (card.gateType === 'M4_GATE') return [
+      { value: 'GO_CONCEPT', label: 'Duyệt đi Concept' },
+      { value: 'RESEARCH_MORE', label: 'Bổ sung nghiên cứu' },
+      { value: 'HOLD', label: 'Giữ theo dõi' },
+      { value: 'STOP', label: 'Dừng' }
+    ];
+    if (card.gateType === 'FINAL_HANDOVER') return [
+      { value: 'APPROVED_FOR_PRODUCT_MASTER_REVIEW', label: 'Duyệt bàn giao cuối' },
+      { value: 'GATE_NEED_MORE_EVIDENCE', label: 'Yêu cầu bổ sung' },
+      { value: 'GATE_REJECTED', label: 'Dừng' }
+    ];
+    return [
+      { value: 'GATE_APPROVED', label: 'Làm tiếp' },
+      { value: 'GATE_NEED_MORE_EVIDENCE', label: 'Bổ sung bằng chứng' },
+      { value: 'GATE_HOLD_RECOMMENDED', label: 'Giữ theo dõi' },
+      { value: 'GATE_REJECTED', label: 'Dừng' }
+    ];
+  }
+
+  async function confirmDecision(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    setNotice('Đang ghi quyết định…');
+    try {
+      let result;
+      if (payload.cardType === 'RESEARCH_REQUEST') {
+        if (payload.priority) {
+          await gas('setRequestPriority', payload.rdRequestId, payload.priority, payload.reason || '');
+        }
+        result = await gas('approveResearch', payload.rdRequestId, payload.decision, payload.reason || '');
+      } else {
+        result = await gas('submitGateDecision', {
+          rdCaseId: payload.rdCaseId,
+          gateType: payload.gateType,
+          decision: payload.decision,
+          scope: payload.scope,
+          costCap: payload.costCap,
+          dueDate: payload.dueDate,
+          requiredEvidence: payload.requiredEvidence,
+          reason: payload.reason
+        });
+      }
+      closeDecisionDialog();
+      await reloadData();
+      setNotice('Đã ghi quyết định.');
+      showViewByName('approvals');
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function closeDecisionDialog() {
+    document.getElementById('decisionDialog').close();
+    activeDecisionCard = null;
+  }
+
+  async function runNow() {
+    setTechnical('Đang chạy R&D…');
+    try { setTechnical(await gas('runDailyRdNow')); await reloadData(); }
+    catch (error) { setTechnical(error.message || String(error)); }
+  }
+
+  async function installTrigger() {
+    setTechnical('Đang cài lịch…');
+    try { setTechnical(await gas('installDailyRdTrigger')); await reloadData(); }
+    catch (error) { setTechnical(error.message || String(error)); }
+  }
+
+  async function verifyTrigger() {
+    setTechnical('Đang kiểm tra…');
+    try { setTechnical(await gas('verifyDailyRdAutomation')); }
+    catch (error) { setTechnical(error.message || String(error)); }
+  }
+
+  function setTechnical(value) {
+    document.getElementById('technicalOutput').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  }
+
+  function showView(name, button) {
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    if (button) button.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showViewByName(name) {
+    const button = document.querySelector(`.nav-item[data-view="${name}"]`);
+    showView(name, button);
+  }
+
+  function uiStatusLabel(value) {
+    const key = String(value || '').toUpperCase();
+    const labels = {
+      REQUESTED: 'Chờ xem xét',
+      MARKET_RESEARCH: 'Nghiên cứu thị trường',
+      MARKET_RESEARCH_IN_PROGRESS: 'Đang nghiên cứu thị trường',
+      GATE_READY_FOR_REVIEW: 'Sẵn sàng duyệt',
+      GATE_NEED_MORE_EVIDENCE: 'Cần thêm bằng chứng',
+      WAITING_AUTHORIZED_APPROVAL: 'Chờ người có quyền duyệt',
+      WAITING_INPUT: 'Chờ dữ liệu',
+      WAITING_DEPENDENCY: 'Chờ bước trước',
+      READY: 'Sẵn sàng',
+      READY_MONITORING: 'Đang theo dõi',
+      IN_PROGRESS: 'Đang thực hiện',
+      BLOCKED: 'Đang bị chặn',
+      STOPPED: 'Đã dừng',
+      HANDOFF_READY: 'Sẵn sàng bàn giao',
+      APPROVED_FOR_PRODUCT_MASTER_REVIEW: 'Đã duyệt bàn giao',
+      AI_PROPOSAL: 'AI đề xuất',
+      IN_RD: 'Đang R&D',
+      WAITING_APPROVAL: 'Chờ duyệt',
+      HANDED_OVER: 'Đã bàn giao',
+      M4_GATE: 'Duyệt thị trường',
+      CONCEPT_GATE: 'Duyệt concept',
+      TECHNICAL_GATE: 'Duyệt kỹ thuật',
+      DFM_GATE: 'Duyệt sản xuất',
+      QA_GATE: 'Duyệt QA / an toàn',
+      PILOT_GATE: 'Duyệt pilot',
+      FINAL_HANDOVER: 'Duyệt bàn giao cuối'
+    };
+    return labels[key] || String(value || '—').replace(/_/g, ' ');
+  }
+
+  function valueOrDash(value, suffix = '') {
+    return value === null || typeof value === 'undefined' ? '—' : String(value) + suffix;
+  }
+
+  function setNotice(message, isError = false) {
+    const box = document.getElementById('notice');
+    box.textContent = message;
+    box.classList.remove('hidden', 'error');
+    if (isError) box.classList.add('error');
+  }
+
+  function hideNotice() {
+    document.getElementById('notice').classList.add('hidden');
+  }
+
+  function showError(error) {
+    setNotice(error && error.message ? error.message : String(error), true);
+  }
+
+  function emptyState(text) {
+    return `<div class="empty-state">${escapeHtml(text)}</div>`;
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, '&#096;');
+  }
+</script>
