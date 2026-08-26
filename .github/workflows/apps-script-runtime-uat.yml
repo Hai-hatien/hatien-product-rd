@@ -1,0 +1,54 @@
+name: HT-PD-RD Apps Script Runtime UAT
+
+on:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - 'runtime/backend-uat-trigger.txt'
+      - '.github/workflows/apps-script-runtime-uat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ht-pd-rd-runtime-uat
+  cancel-in-progress: false
+
+env:
+  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+
+jobs:
+  runtime-uat:
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pinned clasp
+        run: npm install --global '@google/clasp@3.4.0'
+      - name: Load OAuth
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON'; exit 1; }
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > .clasp.json
+      - name: Check whether Gemini migration secret is available without exposing it
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "${GEMINI_API_KEY:-}" ]; then
+            echo 'GITHUB_GEMINI_MIGRATION_SECRET=AVAILABLE'
+          else
+            echo 'GITHUB_GEMINI_MIGRATION_SECRET=NOT_AVAILABLE'
+          fi
+      - name: Execute runtime prerequisite verifier through Apps Script Execution API
+        run: |
+          set -euo pipefail
+          clasp run verifyRuntimePrerequisites --nondev 2>&1 | tee /tmp/runtime-prereq.txt
