@@ -1,0 +1,193 @@
+<style>
+  .request-heading { align-items: center; }
+  .step-badge { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #ddc29e; border-radius: 999px; background: var(--gold-soft); color: var(--amber); font-size: 11px; font-weight: 900; letter-spacing: .45px; }
+  .request-progress { display: grid; grid-template-columns: 30px minmax(80px,220px) 30px; align-items: center; gap: 8px; margin: -4px 0 14px; }
+  .request-progress span { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: 50%; background: #fff; color: var(--muted); font-size: 12px; font-weight: 900; }
+  .request-progress span.active { border-color: var(--navy); background: var(--navy); color: #fff; box-shadow: 0 0 0 4px var(--navy-soft); }
+  .request-progress i { height: 2px; background: var(--line-strong); }
+  .request-step { width: 100%; }
+  .step-title { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .step-title h3 { margin-bottom: 3px; }
+  .step-title p { margin: 0; color: var(--muted); font-size: 13px; }
+  .step-actions { margin-top: 16px; }
+  .panel-copy { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+  .roi-formula { margin-top: 12px; padding: 11px 12px; border: 1px dashed var(--line-strong); border-radius: 7px; background: var(--surface-soft); color: var(--navy); font-weight: 800; }
+  .mobile-ai-nav { display: none; }
+  @media (max-width: 760px) {
+    .request-progress { grid-template-columns: 30px 1fr 30px; }
+    .step-badge { align-self: flex-start; }
+    .mobile-ai-nav { display: block; }
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initMobileAiNav_();
+    initRequestStepper_();
+  });
+
+  function initMobileAiNav_() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar || document.getElementById('mobileAiNav')) return;
+    const overview = sidebar.querySelector('.nav-item[data-view="overview"]');
+    if (!overview) return;
+
+    const button = document.createElement('button');
+    button.id = 'mobileAiNav';
+    button.type = 'button';
+    button.className = 'nav-item mobile-ai-nav';
+    button.dataset.view = 'ai-proposals';
+    button.innerHTML = '<span>✦</span><b>AI đề xuất</b>';
+    button.addEventListener('click', () => {
+      activeCandidateTab = 'AI_PROPOSAL';
+      showView('library', button);
+      const tab = document.querySelector('.candidate-tab[data-candidate-tab="AI_PROPOSAL"]');
+      setCandidateTab('AI_PROPOSAL', tab);
+    });
+    overview.insertAdjacentElement('afterend', button);
+  }
+
+  function renderRuntime(runtime) {
+    const badge = document.getElementById('runtimeBadge');
+    const environment = appData && appData.project ? String(appData.project.environment || 'UAT') : 'UAT';
+    const deployed = Boolean(runtime && runtime.deploymentUrl);
+    badge.className = `badge ${deployed ? 'muted' : 'warn'}`;
+    badge.textContent = deployed ? `${environment} • Web App` : `${environment} • Chưa deploy`;
+
+    const summary = document.getElementById('runtimeSummary');
+    if (!summary) return;
+    summary.innerHTML = `
+      <p><strong>Web App:</strong> ${deployed ? 'Đã có deployment URL' : 'Chưa có URL runtime'}</p>
+      <p><strong>Lịch điều phối cũ:</strong> ${escapeHtml(runtime.schedule || '—')}</p>
+      <p><strong>Trigger điều phối cũ:</strong> ${runtime.triggerInstalled ? 'Đã cài' : 'Chưa xác minh'}</p>
+      <p><strong>Lần chạy cuối:</strong> ${escapeHtml(runtime.lastDailyRunAt || 'CHƯA CÓ')}</p>`;
+  }
+
+  function renderKpis(kpis) {
+    const cards = [
+      ['Cần Anh Hải duyệt', valueOrDash(kpis.openDecisionCount), 'Việc chờ quyết định', 'red'],
+      ['Blocker P0/P1', valueOrDash(kpis.blockerP0P1Count), 'Phải gỡ trước', 'amber'],
+      ['Chi phí R&D', valueOrDash(kpis.rdCost), 'Tiền thực chi đã xác minh', 'gold'],
+      ['ROI dự kiến', valueOrDash(kpis.roi), 'Chưa đủ dữ liệu thì để —', 'green']
+    ];
+    document.getElementById('kpiCards').innerHTML = cards.map(card => `
+      <article class="kpi-card ${card[3]}">
+        <div class="label">${escapeHtml(card[0])}</div>
+        <div class="value">${escapeHtml(String(card[1]))}</div>
+        <div class="hint">${escapeHtml(card[2])}</div>
+      </article>`).join('');
+
+    const detailCards = [
+      ['Hồ sơ đủ để quyết định', valueOrDash(kpis.openDecisionCount), 'Hồ sơ đủ dữ liệu / hồ sơ đến hạn'],
+      ['Blocker P0 tồn đọng', valueOrDash(kpis.blockerP0P1Count), 'Mục tiêu: không có P0 quá hạn'],
+      ['Độ phủ bằng chứng', valueOrDash(kpis.evidenceCoverage, '%'), 'Bằng chứng có / bằng chứng bắt buộc'],
+      ['Truy xuất thử nghiệm', valueOrDash(kpis.traceableTestRate, '%'), 'Revision + run + evidence'],
+      ['Bàn giao', valueOrDash(kpis.handoverCount), 'Hồ sơ không bị trả lại vì thiếu'],
+      ['Claim thiếu bằng chứng', valueOrDash(kpis.claimsMissingEvidence), 'Mục tiêu phải bằng 0']
+    ];
+    document.getElementById('kpiDetailCards').innerHTML = detailCards.map((card, index) => `
+      <article class="kpi-card ${index === 5 && Number(card[1]) > 0 ? 'red' : ''}">
+        <div class="label">${escapeHtml(card[0])}</div>
+        <div class="value">${escapeHtml(String(card[1]))}</div>
+        <div class="hint">${escapeHtml(card[2])}</div>
+      </article>`).join('');
+  }
+
+  function renderDecisionListItem(card) {
+    const ready = card.status === 'GATE_READY_FOR_REVIEW' || card.cardType === 'RESEARCH_REQUEST';
+    const status = card.canApprove && ready ? 'CHỜ ANH HẢI' : uiStatusLabel(card.status);
+    return `
+      <article class="item-card ${ready ? 'ready' : 'blocked'}">
+        <div>
+          <h4>${escapeHtml(card.title)}</h4>
+          <p>${escapeHtml(card.subtitle || card.gateLabel || '')} • ${escapeHtml(status)}</p>
+        </div>
+        <button class="button secondary" type="button" onclick="showViewByName('approvals')">Mở hồ sơ</button>
+      </article>`;
+  }
+
+  function renderDecisionCard(card) {
+    const index = appData.decisionCards.indexOf(card);
+    const buttonDisabled = !card.canApprove;
+    const ready = card.status === 'GATE_READY_FOR_REVIEW' || card.cardType === 'RESEARCH_REQUEST';
+    const statusClass = ready ? '' : 'warn';
+    const statusLabel = card.canApprove && ready ? 'CHỜ ANH HẢI' : uiStatusLabel(card.status);
+    return `
+      <article class="decision-card">
+        <div class="top">
+          <div>
+            <span class="eyebrow">${escapeHtml(card.gateLabel || card.subtitle || 'THẺ QUYẾT ĐỊNH')}</span>
+            <h3>${escapeHtml(card.title)}</h3>
+            <p>${escapeHtml(card.customer || card.subtitle || '')}</p>
+          </div>
+          <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+        </div>
+        <div class="six-boxes">
+          ${infoBox('1. Vấn đề cần giải quyết', card.problem)}
+          ${infoBox('2. Điều mới học được', card.newLearning || card.whyGo || 'CHƯA CÓ DỮ LIỆU')}
+          ${infoBox('3. Bằng chứng đủ / thiếu', card.evidence)}
+          ${infoBox('4. Chi phí bước tiếp theo', card.nextCost)}
+          ${infoBox('5. Khuyến nghị', card.recommendation, true)}
+          ${infoBox('6. Hạn cần quyết định', card.dueDate || 'CHƯA ẤN ĐỊNH')}
+        </div>
+        <details class="analysis-details">
+          <summary>Phân tích thêm: WHY GO / WHY NOT / CHƯA BIẾT</summary>
+          <div class="analysis-grid">
+            <div><strong>WHY GO</strong>${escapeHtml(card.whyGo || 'CHƯA ĐỦ DỮ LIỆU')}</div>
+            <div><strong>WHY NOT / RISK</strong>${escapeHtml(card.whyNot || 'CHƯA PHÁT HIỆN')}</div>
+            <div><strong>CHƯA BIẾT</strong>${escapeHtml(card.criticalUnknowns || 'CHƯA CÓ MỤC TRỌNG YẾU')}</div>
+          </div>
+        </details>
+        <div class="decision-actions">
+          <button class="button secondary" type="button" onclick="openEvidenceForDecision_(${index})">Mở bằng chứng</button>
+          <button class="button secondary" type="button" onclick="showViewByName('kpi')">Xem KPI &amp; ROI</button>
+          <button class="button" type="button" ${buttonDisabled ? 'disabled' : ''} onclick="openDecisionDialog(${index})">Ra quyết định</button>
+        </div>
+      </article>`;
+  }
+
+  function openEvidenceForDecision_(index) {
+    const card = appData && appData.decisionCards ? appData.decisionCards[index] : null;
+    if (card && card.rdCaseId) {
+      showViewByName('evidence');
+      return;
+    }
+    showViewByName('approvals');
+  }
+
+  function initRequestStepper_() {
+    const form = document.getElementById('requestForm');
+    if (!form) return;
+    setRequestStep_(1);
+    form.addEventListener('reset', () => setTimeout(() => setRequestStep_(1), 0));
+  }
+
+  function setRequestStep_(step) {
+    step = Number(step) === 2 ? 2 : 1;
+    document.querySelectorAll('[data-request-step]').forEach(panel => {
+      panel.classList.toggle('hidden', Number(panel.dataset.requestStep) !== step);
+    });
+    const badge = document.getElementById('requestStepBadge');
+    if (badge) badge.textContent = `BƯỚC ${step}/2`;
+    const one = document.getElementById('requestProgressOne');
+    const two = document.getElementById('requestProgressTwo');
+    if (one) one.classList.toggle('active', step >= 1);
+    if (two) two.classList.toggle('active', step >= 2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function nextRequestStep_() {
+    const form = document.getElementById('requestForm');
+    if (!form) return;
+    const required = ['requestTitle', 'targetProduct', 'requestKind', 'targetCustomer', 'customerPain', 'targetMarket'];
+    for (const name of required) {
+      const field = form.elements[name];
+      if (!field) continue;
+      if (!String(field.value || '').trim()) {
+        field.reportValidity();
+        field.focus();
+        return;
+      }
+    }
+    setRequestStep_(2);
+  }
+</script>
