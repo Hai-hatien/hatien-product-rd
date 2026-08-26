@@ -44,6 +44,10 @@ jobs:
           const arr=Array.isArray(raw)?raw:(raw.scripts||raw.projects||[]);
           console.log(String(arr[0]?.scriptId||arr[0]?.id||''));
           console.error('VISIBLE_SCRIPT_COUNT='+arr.length);
+          for (const x of arr) {
+            const title=String(x.title||x.name||'').replace(/[\r\n]/g,' ');
+            if (title) console.error('VISIBLE_TITLE='+title);
+          }
           NODE
           VISIBLE_ID="$(cat /tmp/visible-id)"
           test -n "$VISIBLE_ID" || { echo 'NO_VISIBLE_SCRIPTS'; exit 2; }
@@ -85,15 +89,42 @@ jobs:
             echo 'DEPLOYMENT_OWNER_NOT_IN_VISIBLE_SCRIPT_SET'
             echo 'script_id=' >> "$GITHUB_OUTPUT"
           fi
-      - name: Re-test supplied Script ID
+      - name: Test likely Script ID transcription variants read-only
         run: |
           set -euo pipefail
-          TARGET='1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
-          mkdir -p /tmp/target-script
-          printf '{"scriptId":"%s","rootDir":"."}\n' "$TARGET" > /tmp/target-script/.clasp.json
-          if (cd /tmp/target-script && clasp pull >/tmp/target-pull.out 2>/tmp/target-pull.err); then
-            echo 'SUPPLIED_SCRIPT_ID_PULL=PASS'
+          TARGET_DEPLOYMENT='AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
+          PREFIX='1TGVEpC82jSws4y6'
+          SUFFIX='2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+          FOUND=''
+          ACCESSIBLE=''
+          N=0
+          for A in I l 1; do
+            for B in l I 1; do
+              N=$((N+1))
+              SID="${PREFIX}${A}z${B}${SUFFIX}"
+              DIR="/tmp/variant-$N"
+              mkdir -p "$DIR"
+              printf '{"scriptId":"%s","rootDir":"."}\n' "$SID" > "$DIR/.clasp.json"
+              if (cd "$DIR" && clasp pull >/tmp/variant-$N.out 2>/tmp/variant-$N.err); then
+                echo "VARIANT_${N}_PULL=PASS SCRIPT_ID=$SID"
+                ACCESSIBLE="${ACCESSIBLE}${SID}\n"
+                if OUT="$(cd "$DIR" && clasp list-deployments 2>&1)" && printf '%s' "$OUT" | grep -Fq "$TARGET_DEPLOYMENT"; then
+                  FOUND="$SID"
+                  echo "EXACT_TARGET_SCRIPT_ID=$SID"
+                  break 2
+                else
+                  echo "VARIANT_${N}_DEPLOYMENT_MATCH=NO"
+                fi
+              else
+                MSG="$(tr '\n' ' ' </tmp/variant-$N.err | sed -E 's/[A-Za-z0-9_-]{30,}/[REDACTED]/g' | cut -c1-220)"
+                echo "VARIANT_${N}_PULL=FAIL ${MSG}"
+              fi
+            done
+          done
+          if [ -n "$FOUND" ]; then
+            echo 'TARGET_RESOLUTION=EXACT_DEPLOYMENT_OWNER_CONFIRMED'
+          elif [ -n "$ACCESSIBLE" ]; then
+            echo 'TARGET_RESOLUTION=VARIANT_ACCESSIBLE_BUT_DEPLOYMENT_NOT_MATCHED'
           else
-            echo 'SUPPLIED_SCRIPT_ID_PULL=FAIL'
-            sed -E 's/[A-Za-z0-9_-]{30,}/[REDACTED]/g' /tmp/target-pull.err
+            echo 'TARGET_RESOLUTION=NO_TRANSCRIPTION_VARIANT_ACCESSIBLE_TO_GPT'
           fi
