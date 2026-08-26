@@ -1,0 +1,106 @@
+name: HT-PD-RD Apps Script Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - 'apps-script/ht-pd-rd-v1/**'
+      - '.github/workflows/apps-script-deploy.yml'
+      - 'package.json'
+      - '.claspignore'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ht-pd-rd-apps-script-uat
+  cancel-in-progress: false
+
+env:
+  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+  APPS_SCRIPT_DEPLOYMENT_ID: 'AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
+  ROOT_DIR: 'apps-script/ht-pd-rd-v1'
+
+jobs:
+  deploy-uat:
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install clasp
+        run: npm install
+
+      - name: Fail closed if OAuth credential is missing
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLASPRC_JSON:-}" ]; then
+            echo 'Missing required GitHub Environment secret: CLASPRC_JSON'
+            exit 1
+          fi
+
+      - name: Configure clasp target
+        run: |
+          set -euo pipefail
+          cat > .clasp.json <<EOF
+          {
+            "scriptId": "${APPS_SCRIPT_ID}",
+            "rootDir": "${ROOT_DIR}"
+          }
+          EOF
+
+      - name: Configure clasp OAuth
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+
+      - name: Validate source exists
+        run: |
+          set -euo pipefail
+          test -f "${ROOT_DIR}/appsscript.json"
+          find "${ROOT_DIR}" -maxdepth 1 \( -name '*.gs' -o -name '*.html' \) -type f | grep -q .
+
+      - name: Push source to Apps Script
+        run: npx clasp push --force --project .clasp.json
+
+      - name: Create immutable Apps Script version
+        id: version
+        run: |
+          set -euo pipefail
+          OUT="$(npx clasp create-version "GitHub ${GITHUB_SHA}" --project .clasp.json)"
+          echo "$OUT"
+          VERSION="$(printf '%s' "$OUT" | grep -Eo '[0-9]+' | tail -1)"
+          if [ -z "$VERSION" ]; then
+            echo 'Could not parse Apps Script version number.'
+            exit 1
+          fi
+          echo "number=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update existing UAT Web App deployment
+        run: |
+          set -euo pipefail
+          npx clasp create-deployment \
+            --deploymentId "${APPS_SCRIPT_DEPLOYMENT_ID}" \
+            --versionNumber "${{ steps.version.outputs.number }}" \
+            --description "HT-PD-RD UAT ${GITHUB_SHA}" \
+            --project .clasp.json
+
+      - name: Deployment coordinate
+        run: |
+          echo "Apps Script project: ${APPS_SCRIPT_ID}"
+          echo "Deployment updated: ${APPS_SCRIPT_DEPLOYMENT_ID}"
+          echo "Source commit: ${GITHUB_SHA}"
