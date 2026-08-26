@@ -107,8 +107,12 @@ mustContain('UatBackendTestService.gs', [
 
 const deploy = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'apps-script-deploy.yml'), 'utf8');
 assert(deploy.includes("test -f .backend-uat-deploy-ready"), 'deploy must fail closed without backend marker');
-assert(deploy.includes('workflow_dispatch'), 'canonical deployment must be manual during P0 gate');
-assert(!/\npush\s*:/.test(deploy), 'canonical deployment must not auto-push during P0 gate');
+assert(deploy.includes('workflow_dispatch'), 'canonical deployment must retain explicit manual dispatch');
+assert(deploy.includes("- '.backend-uat-deploy-ready'"), 'push deploy trigger must be scoped only to backend UAT marker');
+assert(deploy.includes("APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'"), 'deploy must use read-only verified lowercase-l Script ID');
+assert(deploy.includes('TARGET_OWNERSHIP_PRECHECK=PASS'), 'deploy must verify target deployment ownership before mutation');
+assert(deploy.includes("! -name 'Code.js' -delete"), 'deploy must preserve Web App Code.js shell while replacing backend JS');
+assert(deploy.includes('UX_SHELL_PRESERVED=YES'), 'deploy evidence must state frozen UX shell preservation');
 
 const uiPreview = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'apps-script-ui-preview.yml'), 'utf8');
 assert(uiPreview.includes('FROZEN BY BACKEND P0'), 'UI preview must remain frozen');
