@@ -34,7 +34,8 @@ mustContain('WorkflowService.gs', [
   "'R3.1': 'M0:CONFIRMED'",
   "'R4.1': 'R1.5|R2.6|R3.6|GATE:M4'",
   'releaseResearchFanoutAfterM0_',
-  'Chưa đủ bằng chứng để GO_CONCEPT'
+  'gateCoverage_',
+  'if (positive && !coverage.ready)'
 ]);
 
 mustContain('Core.gs', [
