@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = "$CANONICAL_REPOSITORY"
           test "$GITHUB_REF_NAME" = "$CANONICAL_BRANCH"
-          if grep -R --line-number --fixed-strings 'Hai-hatien/hatien-digital-platform' apps-script/ht-pd-rd-v1 .github/workflows/apps-script-deploy.yml; then
+          if grep -R --line-number --fixed-strings 'Hai-hatien/hatien-digital-platform' apps-script/ht-pd-rd-v1; then
             echo 'Legacy hatien-digital-platform runtime source is forbidden.'
             exit 1
           fi
@@ -92,8 +92,6 @@ jobs:
       - name: Build backend-only overlay while preserving current UX shell
         run: |
           set -euo pipefail
-          # UX is frozen: preserve current Code.js launcher and all HTML exactly as pulled.
-          # Remove legacy backend JS, then overlay only canonical backend files.
           find remote-script -maxdepth 1 -type f -name '*.js' ! -name 'Code.js' -delete
           for src in "$ROOT_DIR"/*.gs; do
             base="$(basename "${src%.gs}")"
