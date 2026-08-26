@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <?!= include_('Styles'); ?>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-block">
+      <span class="brand-kicker">HÀ TIÊN</span>
+      <h1>PRODUCT R&amp;D COMMAND CENTER</h1>
+      <p id="subtitle">Đang tải dữ liệu…</p>
+    </div>
+    <div class="header-actions">
+      <span id="runtimeBadge" class="badge muted">Hệ thống</span>
+      <button class="button secondary compact" type="button" onclick="reloadData()">Làm mới</button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Điều hướng R&D">
+      <button class="nav-item active" data-view="overview" onclick="showView('overview', this)"><span>⌂</span><b>Tổng quan</b></button>
+      <button class="nav-item" data-view="request" onclick="showView('request', this)"><span>＋</span><b>Tạo yêu cầu</b></button>
+      <button class="nav-item desktop-secondary" data-view="cases" onclick="showView('cases', this)"><span>▤</span><b>Hồ sơ R&amp;D</b></button>
+      <button class="nav-item" data-view="approvals" onclick="showView('approvals', this)"><span>✓</span><b>Cần duyệt</b></button>
+      <button class="nav-item desktop-secondary" data-view="kpi" onclick="showView('kpi', this)"><span>⌁</span><b>KPI &amp; ROI</b></button>
+      <button class="nav-item desktop-secondary" data-view="evidence" onclick="showView('evidence', this)"><span>◫</span><b>Bằng chứng</b></button>
+      <button class="nav-item" data-view="library" onclick="showView('library', this)"><span>▦</span><b>Thư viện</b></button>
+      <button id="techNav" class="nav-item desktop-secondary hidden" data-view="technical" onclick="showView('technical', this)"><span>⚙</span><b>Kỹ thuật</b></button>
+    </aside>
+
+    <main class="content">
+      <section id="notice" class="notice hidden"></section>
+
+      <section id="view-overview" class="view active">
+        <div class="hero-mobile executive-hero">
+          <div><span class="eyebrow">TỔNG QUAN ĐIỀU HÀNH R&amp;D</span><h2>Hôm nay cần quyết gì?</h2><p>Chỉ tập trung vào hồ sơ cần quyết định, blocker và tiền của bước tiếp theo.</p></div>
+          <button class="button primary-cta" type="button" onclick="showViewByName('request')">+ Tạo yêu cầu R&amp;D mới</button>
+        </div>
+        <div id="kpiCards" class="kpi-grid executive-kpis"></div>
+        <div class="panel priority-panel">
+          <div class="panel-heading"><div><span class="eyebrow">CẦN ANH HẢI DUYỆT</span><h3>Việc cần Anh Hải quyết định</h3><p class="panel-copy">Mở việc đến hạn trước; không cần đọc log Agent.</p></div><button class="link-button" type="button" onclick="showViewByName('approvals')">Xem tất cả</button></div>
+          <div id="overviewDecisions" class="card-list"></div>
+        </div>
+        <div class="panel ai-proposal-panel">
+          <div class="panel-heading"><div><span class="eyebrow">AI MARKET SCOUT</span><h3>Đề xuất R&amp;D mới</h3><p class="panel-copy">Chỉ hiện ứng viên có tín hiệu đủ để xem; chưa phải Product Master.</p></div><button class="link-button" type="button" onclick="openLibraryTab('AI_PROPOSAL')">Mở thư viện</button></div>
+          <div id="overviewAiCandidates" class="candidate-list"></div>
+        </div>
+        <div class="two-column weekly-grid">
+          <div class="panel"><span class="eyebrow">CẬP NHẬT TUẦN</span><h3>Điều mới học được &amp; việc 7 ngày tới</h3><div id="weeklySummary" class="summary-lines"></div></div>
+          <div class="panel decision-rule-panel"><span class="eyebrow">QUY TẮC RA QUYẾT ĐỊNH</span><h3>Chỉ đọc 6 ô</h3><div class="quick-rule-grid"><span>1. Vấn đề</span><span>2. Điều mới</span><span>3. Bằng chứng</span><span>4. Chi phí bước sau</span><span>5. Khuyến nghị</span><span>6. Hạn quyết định</span></div></div>
+        </div>
+      </section>
+
+      <section id="view-request" class="view">
+        <div class="section-heading request-heading"><div><span class="eyebrow">YÊU CẦU NGHIÊN CỨU SẢN PHẨM MỚI</span><h2>Tạo yêu cầu R&amp;D</h2><p>Gửi yêu cầu chỉ tạo trạng thái REQUESTED; chưa tự duyệt thành dự án R&amp;D.</p></div><div class="step-badge" id="requestStepBadge">BƯỚC 1/2</div></div>
+        <div class="request-progress" aria-hidden="true"><span id="requestProgressOne" class="active">1</span><i></i><span id="requestProgressTwo">2</span></div>
+        <form id="requestForm" class="panel form-grid mobile-form" onsubmit="submitRequest(event)">
+          <div class="request-step span-2" data-request-step="1"><div class="step-title"><h3>Đề bài, khách hàng và thị trường</h3><p>Viết theo mẫu: khách hàng nào - gặp vấn đề gì - trong điều kiện vận hành nào.</p></div><div class="form-grid inner-grid">
+            <label class="span-2">1. Từ khóa / tên đề bài<input name="requestTitle" required placeholder="Ví dụ: Fryer hồi nhiệt nhanh cho bếp trung tâm"></label>
+            <label>2. Dòng sản phẩm<select name="targetProduct" required><option value="Fryer công nghiệp">Fryer công nghiệp</option><option value="KHÁC / TÙY CHỈNH">Khác / tùy chỉnh</option><option value="SẢN PHẨM MỚI - CHƯA CÓ DÒNG">Sản phẩm mới - chưa có dòng</option></select></label>
+            <label>3. Loại yêu cầu<select name="requestKind" required><option value="IMPROVEMENT">Cải tiến hiện hữu</option><option value="CUSTOM_VARIANT">Tùy chỉnh</option><option value="NEW_PRODUCT">Sản phẩm mới</option></select></label>
+            <label class="span-2">4. Ai đang gặp vấn đề? / phân khúc khách hàng<input name="targetCustomer" required placeholder="Chuỗi F&amp;B / Bếp trung tâm / Nhà máy / Trường học…"></label>
+            <label class="span-2">5. Vấn đề vận hành cụ thể<textarea name="customerPain" rows="4" required placeholder="Ví dụ: Nhiệt tụt mạnh khi nạp tải; thời gian hồi nhiệt chưa đạt mục tiêu."></textarea></label>
+            <label class="span-2">6. Thị trường<input name="targetMarket" required placeholder="Việt Nam / Úc / Mỹ / Khác"></label>
+          </div><div class="form-actions step-actions"><button type="reset" class="button secondary">Xóa</button><button type="button" class="button" onclick="nextRequestStep_()">Tiếp tục</button></div></div>
+          <div class="request-step span-2 hidden" data-request-step="2"><div class="step-title"><h3>Mục tiêu kỹ thuật, ràng buộc và bằng chứng</h3><p>Chưa biết thì ghi CHƯA BIẾT; không tự đoán giá, model hay thông số.</p></div><div class="form-grid inner-grid">
+            <label class="span-2">1. Mục tiêu kỹ thuật<textarea name="targetOutcomes" rows="4" placeholder="Năng suất, thời gian hồi nhiệt, dải nhiệt, điện/gas, vệ sinh, an toàn…"></textarea></label>
+            <label>2. Giới hạn kích thước<input name="sizeLimit" placeholder="Dài × rộng × cao tối đa"></label><label>3. Nguồn năng lượng<select name="energySource"><option value="CHƯA BIẾT">CHƯA BIẾT</option><option value="GAS">Gas</option><option value="ELECTRIC">Điện</option><option value="BOTH">Cả hai</option></select></label>
+            <label>4. Vật liệu / môi trường<input name="materialEnvironment" placeholder="SUS304, dầu, nhiệt độ môi trường…"></label><label>5. Ngân sách mục tiêu<input name="targetBudget" placeholder="CHƯA BIẾT hoặc mức mục tiêu"></label>
+            <label>6. Ngày cần quyết định<input name="decisionDueDate" type="date"></label><label>7. Nguồn yêu cầu<select name="sourceType"><option value="INTERNAL_REQUEST">Nội bộ</option><option value="CUSTOMER">Khách hàng</option><option value="PROJECT">Dự án</option><option value="AFTERSALES">Hậu mãi</option><option value="COMPETITOR">Đối thủ</option></select></label>
+            <label class="span-2">8. Link nguồn / tệp bằng chứng<input name="sourceRef" placeholder="Drive URL, video, spec, phản hồi khách hàng hoặc file gốc"></label><label class="span-2">Ràng buộc khác<textarea name="constraints" rows="3" placeholder="CHƯA BIẾT nếu chưa xác định"></textarea></label>
+          </div><div class="form-actions step-actions sticky-mobile-action"><button type="button" class="button secondary" onclick="setRequestStep_(1)">Quay lại</button><button type="submit" class="button">Gửi yêu cầu</button></div></div>
+        </form>
+      </section>
+
+      <section id="view-cases" class="view"><div class="section-heading"><div><span class="eyebrow">HỒ SƠ R&amp;D</span><h2>Hồ sơ đang nghiên cứu</h2></div></div><div id="caseList" class="card-list"></div><div id="caseDetail" class="panel hidden"></div></section>
+      <section id="view-approvals" class="view"><div class="section-heading"><div><span class="eyebrow">CẦN ANH HẢI DUYỆT</span><h2>Thẻ quyết định</h2><p>Đọc 6 ô trước; chỉ ra quyết định khi bằng chứng phù hợp với phạm vi xin duyệt.</p></div></div><div id="approvalCards" class="decision-grid"></div></section>
+      <section id="view-kpi" class="view"><div class="section-heading"><div><span class="eyebrow">KPI ĐIỀU HÀNH R&amp;D</span><h2>KPI &amp; ROI</h2><p>Không tính số task Agent đã chạy làm KPI thành công.</p></div></div><div id="kpiDetailCards" class="kpi-grid kpi-detail-grid"></div><div class="panel roi-panel"><div class="panel-heading"><div><span class="eyebrow">ROI</span><h3>Có đáng đầu tư bước tiếp không?</h3></div><span class="badge muted">ĐỘ TIN CẬY: CHƯA XÁC ĐỊNH</span></div><p>Chưa có dữ liệu chi phí/lợi nhuận được xác minh thì hiển thị “—”. Hệ thống không tự đoán giá bán hoặc lợi nhuận.</p><div class="roi-formula">ROI dự kiến = (Giá trị kinh tế 12 tháng - Tổng đầu tư R&amp;D) / Tổng đầu tư R&amp;D</div></div></section>
+      <section id="view-evidence" class="view"><div class="section-heading"><div><span class="eyebrow">ĐÚNG REVISION - ĐÚNG TEST RUN - ĐÚNG TỆP GỐC</span><h2>Bằng chứng &amp; kết quả thử</h2></div></div><div class="panel table-wrap"><table><thead><tr><th>ID</th><th>Case</th><th>Revision</th><th>Test run</th><th>Nhãn</th><th>Tệp/nguồn</th></tr></thead><tbody id="evidenceBody"></tbody></table></div></section>
+      <section id="view-library" class="view"><div class="section-heading"><div><span class="eyebrow">THƯ VIỆN SẢN PHẨM R&amp;D</span><h2>Ứng viên &amp; hồ sơ R&amp;D</h2><p>Ứng viên R&amp;D không phải Product Master và chưa phải SKU bán hàng.</p></div></div><div class="candidate-tabs" role="tablist"><button class="candidate-tab active" data-candidate-tab="AI_PROPOSAL" onclick="setCandidateTab('AI_PROPOSAL', this)">AI đề xuất <span id="count-ai">0</span></button><button class="candidate-tab" data-candidate-tab="IN_RD" onclick="setCandidateTab('IN_RD', this)">Đang R&amp;D <span id="count-rd">0</span></button><button class="candidate-tab" data-candidate-tab="WAITING_APPROVAL" onclick="setCandidateTab('WAITING_APPROVAL', this)">Chờ duyệt <span id="count-wait">0</span></button><button class="candidate-tab" data-candidate-tab="HANDED_OVER" onclick="setCandidateTab('HANDED_OVER', this)">Đã bàn giao <span id="count-done">0</span></button></div><div id="candidateLibrary" class="candidate-list"></div></section>
+      <section id="view-technical" class="view"><div class="section-heading"><div><span class="eyebrow">KỸ THUẬT</span><h2>Vận hành hệ thống</h2></div></div><div class="panel"><p>Phần này chỉ dành cho tài khoản kỹ thuật.</p><div id="runtimeSummary"></div><div class="button-row"><button class="button" type="button" onclick="runNow()">Chạy ngay</button><button class="button" type="button" onclick="installTrigger()">Cài lịch</button><button class="button secondary" type="button" onclick="verifyTrigger()">Kiểm tra lịch</button></div><pre id="technicalOutput" class="code-output">Chưa chạy kiểm tra.</pre></div></section>
+    </main>
+  </div>
+
+  <dialog id="decisionDialog"><form method="dialog" id="decisionForm" onsubmit="confirmDecision(event)"><div class="dialog-heading"><div><span class="eyebrow">XÁC NHẬN QUYẾT ĐỊNH</span><h3 id="decisionTitle">Ra quyết định</h3></div><button type="button" class="icon-button" onclick="closeDecisionDialog()">×</button></div><input type="hidden" name="cardType"><input type="hidden" name="rdRequestId"><input type="hidden" name="rdCaseId"><input type="hidden" name="gateType"><label>1. Chọn quyết định<select name="decision" id="decisionSelect" required></select></label><label id="priorityField" class="hidden">2. Mức ưu tiên P0-P3<select name="priority"><option value="">Chưa chọn</option><option value="P0">P0</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option></select></label><label>Phạm vi được duyệt<input name="scope" placeholder="Ví dụ: chỉ duyệt nghiên cứu thị trường / chỉ duyệt prototype R01"></label><label>Trần chi phí được phép<input name="costCap" placeholder="Nhập số tiền hoặc ghi chưa duyệt chi phí"></label><label>Hạn hoàn thành<input name="dueDate" type="date"></label><label>Bằng chứng bắt buộc ở lần duyệt sau<textarea name="requiredEvidence" rows="2" placeholder="Video test, log nhiệt, BOM cập nhật, QA checklist…"></textarea></label><label>Lý do quyết định<textarea name="reason" rows="3" required placeholder="Ghi ngắn gọn lý do; hệ thống lưu vào Decision Log"></textarea></label><div class="form-actions dialog-actions"><button type="button" class="button secondary" onclick="closeDecisionDialog()">Hủy</button><button type="submit" class="button">Xác nhận</button></div></form></dialog>
+
+  <?!= include_('Client'); ?>
+  <?!= include_('ClientCandidateDetail'); ?>
+  <?!= include_('ExecutiveUx'); ?>
+</body>
+</html>
