@@ -58,6 +58,23 @@ test('M4 positive decision is evidence-gated', () => {
   assert(source.includes("if (positive && !coverage.ready)"));
 });
 
+test('Positive M4 decision rejects generically when evidence coverage is not ready', () => {
+  flow.requirePermission_ = () => ({ email: 'gpt@hatiencorp.vn', permissions: { approveGate: true } });
+  flow.assertRequired_ = () => {};
+  flow.assertIn_ = () => {};
+  flow.findObjectById_ = () => ({ record: { M4_DECISION: '' } });
+  flow.gateCoverage_ = () => ({
+    ready: false,
+    missing: ['Market evidence đã xác minh'],
+    checks: [{ name: 'Market evidence đã xác minh', ok: false }],
+    evidenceSummary: {}
+  });
+  assert.throws(
+    () => flow.submitGateDecision({ gateType: 'M4_GATE', rdCaseId: 'RDCASE-UAT', decision: 'GO_CONCEPT' }),
+    error => /Chưa đủ bằng chứng/.test(String(error && error.message)) && /M4_GATE/.test(String(error && error.message))
+  );
+});
+
 test('Final handover is only approved by finalApprove and leaves Product identities blank', () => {
   assert.equal(flow.__gates.FINAL_HANDOVER.permission, 'finalApprove');
   const source = fs.readFileSync(path.join(root, 'WorkflowService.gs'), 'utf8');
