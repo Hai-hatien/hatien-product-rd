@@ -30,9 +30,39 @@ jobs:
           test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON'; exit 1; }
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
-      - name: Pull current Apps Script source read-only
+      - name: Verify authorized account without exposing credential
         run: |
           set -euo pipefail
+          clasp show-authorized-user --json > /tmp/authorized-user.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = JSON.parse(fs.readFileSync('/tmp/authorized-user.json','utf8'));
+          const email = raw.email || raw.user?.email || raw.authorizedUser?.email || raw.account || 'UNKNOWN';
+          console.log('AUTHORIZED_USER=' + email);
+          NODE
+      - name: Discover visible Apps Script projects read-only
+        id: discover
+        run: |
+          set -euo pipefail
+          clasp list-scripts --json > /tmp/scripts.json
+          node - <<'NODE' | tee /tmp/target-script.txt
+          const fs = require('fs');
+          const target='1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL';
+          const raw=JSON.parse(fs.readFileSync('/tmp/scripts.json','utf8'));
+          const arr=Array.isArray(raw) ? raw : (raw.scripts || raw.projects || []);
+          const norm=arr.map(x=>({scriptId:String(x.scriptId||x.id||''),title:String(x.title||x.name||'')}));
+          const exact=norm.find(x=>x.scriptId===target);
+          const rd=norm.filter(x=>/R&D|Product R&D|HT-PD-RD/i.test(x.title)).slice(0,10);
+          console.log('TARGET_VISIBLE=' + Boolean(exact));
+          if (exact) console.log('TARGET_TITLE=' + exact.title.replace(/[\r\n]/g,' '));
+          rd.forEach((x,i)=>console.log(`RDCAND_${i+1}=${x.scriptId}|${x.title.replace(/[\r\n]/g,' ')}`));
+          if (!exact) process.exitCode=2;
+          NODE
+      - name: Pull current Apps Script source read-only
+        if: steps.discover.outcome == 'success'
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/ht-pd-rd-remote
           mkdir -p /tmp/ht-pd-rd-remote
           printf '{"scriptId":"%s","rootDir":"."}\n' '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL' > /tmp/ht-pd-rd-remote/.clasp.json
           (cd /tmp/ht-pd-rd-remote && clasp pull)
@@ -45,6 +75,7 @@ jobs:
             find /tmp/ht-pd-rd-remote -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum
           } | tee /tmp/ht-pd-rd-remote/REMOTE_MANIFEST.txt
       - name: Upload remote snapshot evidence
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ht-pd-rd-apps-script-remote-snapshot
