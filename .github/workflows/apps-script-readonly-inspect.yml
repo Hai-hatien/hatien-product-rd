@@ -1,0 +1,53 @@
+name: HT-PD-RD Apps Script Readonly Inspect
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - '.github/workflows/apps-script-readonly-inspect.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pinned clasp
+        run: npm install --global '@google/clasp@3.4.0'
+      - name: Configure OAuth fail-closed
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON'; exit 1; }
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+      - name: Pull current Apps Script source read-only
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ht-pd-rd-remote
+          printf '{"scriptId":"%s","rootDir":"."}\n' '1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL' > /tmp/ht-pd-rd-remote/.clasp.json
+          (cd /tmp/ht-pd-rd-remote && clasp pull)
+          rm -f /tmp/ht-pd-rd-remote/.clasp.json
+          {
+            echo 'SCRIPT_ID=1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+            echo "INSPECTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            find /tmp/ht-pd-rd-remote -maxdepth 1 -type f -printf '%f\n' | sort
+            echo '--- SHA256 ---'
+            find /tmp/ht-pd-rd-remote -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum
+          } | tee /tmp/ht-pd-rd-remote/REMOTE_MANIFEST.txt
+      - name: Upload remote snapshot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ht-pd-rd-apps-script-remote-snapshot
+          path: /tmp/ht-pd-rd-remote/
+          if-no-files-found: error
+          retention-days: 7
