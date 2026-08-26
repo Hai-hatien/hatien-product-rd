@@ -55,76 +55,31 @@ jobs:
           printf '{"scriptId":"%s","rootDir":"."}\n' "$VISIBLE_ID" > /tmp/visible-script/.clasp.json
           (cd /tmp/visible-script && clasp pull >/dev/null)
           echo 'CONTROL_PULL=PASS'
-      - name: Find which visible script owns current Web App deployment
-        id: find
+      - name: Verify exact target ownership
         run: |
           set -euo pipefail
+          TARGET='1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
           TARGET_DEPLOYMENT='AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
-          node - <<'NODE' > /tmp/visible-ids
-          const fs=require('fs');
-          const raw=JSON.parse(fs.readFileSync('/tmp/scripts.json','utf8'));
-          const arr=Array.isArray(raw)?raw:(raw.scripts||raw.projects||[]);
-          for (const x of arr) {
-            const id=String(x.scriptId||x.id||'').trim();
-            if (id) console.log(id);
-          }
-          NODE
-          FOUND=''
-          COUNT=0
-          while IFS= read -r SID; do
-            COUNT=$((COUNT+1))
-            mkdir -p "/tmp/s-$COUNT"
-            printf '{"scriptId":"%s","rootDir":"."}\n' "$SID" > "/tmp/s-$COUNT/.clasp.json"
-            if OUT="$(cd "/tmp/s-$COUNT" && clasp list-deployments 2>&1)"; then
-              if printf '%s' "$OUT" | grep -Fq "$TARGET_DEPLOYMENT"; then
-                FOUND="$SID"
-                break
-              fi
-            fi
-          done < /tmp/visible-ids
-          if [ -n "$FOUND" ]; then
-            echo "MATCHED_SCRIPT_ID=$FOUND"
-            echo "script_id=$FOUND" >> "$GITHUB_OUTPUT"
-          else
-            echo 'DEPLOYMENT_OWNER_NOT_IN_VISIBLE_SCRIPT_SET'
-            echo 'script_id=' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Test likely Script ID transcription variants read-only
+          rm -rf /tmp/target-script
+          mkdir -p /tmp/target-script
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$TARGET" > /tmp/target-script/.clasp.json
+          (cd /tmp/target-script && clasp pull >/dev/null)
+          OUT="$(cd /tmp/target-script && clasp list-deployments 2>&1)"
+          printf '%s\n' "$OUT" | grep -F "$TARGET_DEPLOYMENT"
+          echo "EXACT_TARGET_SCRIPT_ID=$TARGET"
+          echo 'TARGET_RESOLUTION=EXACT_DEPLOYMENT_OWNER_CONFIRMED'
+      - name: Inspect target runtime file manifest and drift read-only
         run: |
           set -euo pipefail
-          TARGET_DEPLOYMENT='AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
-          PREFIX='1TGVEpC82jSws4y6'
-          SUFFIX='2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
-          FOUND=''
-          ACCESSIBLE=''
-          N=0
-          for A in I l 1; do
-            for B in l I 1; do
-              N=$((N+1))
-              SID="${PREFIX}${A}z${B}${SUFFIX}"
-              DIR="/tmp/variant-$N"
-              mkdir -p "$DIR"
-              printf '{"scriptId":"%s","rootDir":"."}\n' "$SID" > "$DIR/.clasp.json"
-              if (cd "$DIR" && clasp pull >/tmp/variant-$N.out 2>/tmp/variant-$N.err); then
-                echo "VARIANT_${N}_PULL=PASS SCRIPT_ID=$SID"
-                ACCESSIBLE="${ACCESSIBLE}${SID}\n"
-                if OUT="$(cd "$DIR" && clasp list-deployments 2>&1)" && printf '%s' "$OUT" | grep -Fq "$TARGET_DEPLOYMENT"; then
-                  FOUND="$SID"
-                  echo "EXACT_TARGET_SCRIPT_ID=$SID"
-                  break 2
-                else
-                  echo "VARIANT_${N}_DEPLOYMENT_MATCH=NO"
-                fi
-              else
-                MSG="$(tr '\n' ' ' </tmp/variant-$N.err | sed -E 's/[A-Za-z0-9_-]{30,}/[REDACTED]/g' | cut -c1-220)"
-                echo "VARIANT_${N}_PULL=FAIL ${MSG}"
-              fi
-            done
+          cd /tmp/target-script
+          echo 'REMOTE_FILE_MANIFEST_BEGIN'
+          find . -maxdepth 1 -type f ! -name '.clasp.json' -printf '%f\n' | sort
+          echo 'REMOTE_FILE_MANIFEST_END'
+          echo "REMOTE_GS_COUNT=$(find . -maxdepth 1 -type f -name '*.gs' | wc -l | tr -d ' ')"
+          echo "REMOTE_HTML_COUNT=$(find . -maxdepth 1 -type f -name '*.html' | wc -l | tr -d ' ')"
+          for f in Code.gs Index.html Client.html Styles.html appsscript.json; do
+            if [ -f "$f" ]; then echo "REMOTE_HAS_${f//[^A-Za-z0-9]/_}=YES"; else echo "REMOTE_HAS_${f//[^A-Za-z0-9]/_}=NO"; fi
           done
-          if [ -n "$FOUND" ]; then
-            echo 'TARGET_RESOLUTION=EXACT_DEPLOYMENT_OWNER_CONFIRMED'
-          elif [ -n "$ACCESSIBLE" ]; then
-            echo 'TARGET_RESOLUTION=VARIANT_ACCESSIBLE_BUT_DEPLOYMENT_NOT_MATCHED'
-          else
-            echo 'TARGET_RESOLUTION=NO_TRANSCRIPTION_VARIANT_ACCESSIBLE_TO_GPT'
-          fi
+          if grep -R -q --include='*.gs' 'runDailyRdOrchestrator' .; then echo 'REMOTE_LEGACY_ORCHESTRATOR=YES'; else echo 'REMOTE_LEGACY_ORCHESTRATOR=NO'; fi
+          if grep -R -q --include='*.gs' 'OPENAI_API_KEY\|api.openai.com' .; then echo 'REMOTE_OPENAI_RUNTIME=YES'; else echo 'REMOTE_OPENAI_RUNTIME=NO'; fi
+          if grep -R -q --include='*.gs' 'function doGet' .; then echo 'REMOTE_DOGET=YES'; else echo 'REMOTE_DOGET=NO'; fi
