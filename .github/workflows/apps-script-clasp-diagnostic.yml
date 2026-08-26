@@ -34,8 +34,7 @@ jobs:
           const x=require('/tmp/user.json');
           console.log('AUTHORIZED_USER='+(x.email||x.user?.email||x.authorizedUser?.email||'UNKNOWN'));
           NODE
-      - name: Test Apps Script API against one visible script
-        id: visible
+      - name: Verify Apps Script API with one visible script
         run: |
           set -euo pipefail
           clasp list-scripts --json > /tmp/scripts.json
@@ -50,23 +49,51 @@ jobs:
           test -n "$VISIBLE_ID" || { echo 'NO_VISIBLE_SCRIPTS'; exit 2; }
           mkdir -p /tmp/visible-script
           printf '{"scriptId":"%s","rootDir":"."}\n' "$VISIBLE_ID" > /tmp/visible-script/.clasp.json
-          if (cd /tmp/visible-script && clasp pull >/tmp/visible-pull.out 2>/tmp/visible-pull.err); then
-            echo 'CONTROL_PULL=PASS'
+          (cd /tmp/visible-script && clasp pull >/dev/null)
+          echo 'CONTROL_PULL=PASS'
+      - name: Find which visible script owns current Web App deployment
+        id: find
+        run: |
+          set -euo pipefail
+          TARGET_DEPLOYMENT='AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy'
+          node - <<'NODE' > /tmp/visible-ids
+          const fs=require('fs');
+          const raw=JSON.parse(fs.readFileSync('/tmp/scripts.json','utf8'));
+          const arr=Array.isArray(raw)?raw:(raw.scripts||raw.projects||[]);
+          for (const x of arr) {
+            const id=String(x.scriptId||x.id||'').trim();
+            if (id) console.log(id);
+          }
+          NODE
+          FOUND=''
+          COUNT=0
+          while IFS= read -r SID; do
+            COUNT=$((COUNT+1))
+            mkdir -p "/tmp/s-$COUNT"
+            printf '{"scriptId":"%s","rootDir":"."}\n' "$SID" > "/tmp/s-$COUNT/.clasp.json"
+            if OUT="$(cd "/tmp/s-$COUNT" && clasp list-deployments 2>&1)"; then
+              if printf '%s' "$OUT" | grep -Fq "$TARGET_DEPLOYMENT"; then
+                FOUND="$SID"
+                break
+              fi
+            fi
+          done < /tmp/visible-ids
+          if [ -n "$FOUND" ]; then
+            echo "MATCHED_SCRIPT_ID=$FOUND"
+            echo "script_id=$FOUND" >> "$GITHUB_OUTPUT"
           else
-            echo 'CONTROL_PULL=FAIL'
-            sed -E 's/[A-Za-z0-9_-]{30,}/[REDACTED]/g' /tmp/visible-pull.err
-            exit 3
+            echo 'DEPLOYMENT_OWNER_NOT_IN_VISIBLE_SCRIPT_SET'
+            echo 'script_id=' >> "$GITHUB_OUTPUT"
           fi
-      - name: Test target Script ID read-only
+      - name: Re-test supplied Script ID
         run: |
           set -euo pipefail
           TARGET='1TGVEpC82jSws4y6Izl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
           mkdir -p /tmp/target-script
           printf '{"scriptId":"%s","rootDir":"."}\n' "$TARGET" > /tmp/target-script/.clasp.json
           if (cd /tmp/target-script && clasp pull >/tmp/target-pull.out 2>/tmp/target-pull.err); then
-            echo 'TARGET_PULL=PASS'
+            echo 'SUPPLIED_SCRIPT_ID_PULL=PASS'
           else
-            echo 'TARGET_PULL=FAIL'
+            echo 'SUPPLIED_SCRIPT_ID_PULL=FAIL'
             sed -E 's/[A-Za-z0-9_-]{30,}/[REDACTED]/g' /tmp/target-pull.err
-            exit 4
           fi
