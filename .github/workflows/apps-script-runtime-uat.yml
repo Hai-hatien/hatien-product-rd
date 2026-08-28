@@ -18,6 +18,8 @@ concurrency:
 
 env:
   APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+  RUNTIME_GCP_PROJECT_ID: 'ha-tien-product-rd'
+  RUNTIME_USER_KEY: 'runtime-uat'
 
 jobs:
   runtime-uat:
@@ -36,21 +38,16 @@ jobs:
       - name: Require dedicated Runtime Execution API credential
         env:
           CLASP_RUNTIME_JSON: ${{ secrets.CLASP_RUNTIME_JSON }}
-          RUNTIME_GCP_PROJECT_ID: ${{ secrets.RUNTIME_GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
           test -n "${CLASP_RUNTIME_JSON:-}" || {
             echo 'Missing CLASP_RUNTIME_JSON. Runtime UAT requires OAuth created from the SAME standard Google Cloud project attached to the Apps Script project.'
             exit 1
           }
-          test -n "${RUNTIME_GCP_PROJECT_ID:-}" || {
-            echo 'Missing RUNTIME_GCP_PROJECT_ID. Runtime UAT requires the shared standard Google Cloud Project ID.'
-            exit 1
-          }
           printf '%s' "$CLASP_RUNTIME_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
           printf '{"scriptId":"%s","rootDir":".","projectId":"%s"}\n' "$APPS_SCRIPT_ID" "$RUNTIME_GCP_PROJECT_ID" > .clasp.json
-          clasp show-authorized-user --json > /tmp/runtime-user.json
+          clasp --user "$RUNTIME_USER_KEY" show-authorized-user --json > /tmp/runtime-user.json
           node - <<'NODE'
           const x=require('/tmp/runtime-user.json');
           const email=x.email||x.user?.email||x.authorizedUser?.email||'UNKNOWN';
@@ -76,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          OUT="$(clasp run verifyRuntimePrerequisites --nondev 2>&1)"
+          OUT="$(clasp --user "$RUNTIME_USER_KEY" run verifyRuntimePrerequisites --nondev 2>&1)"
           RC=$?
           set -e
           printf '%s\n' "$OUT" | tee /tmp/runtime-prereq.txt
