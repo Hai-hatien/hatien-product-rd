@@ -15,6 +15,18 @@ This repository contains only the Product R&D system. It must not contain HTG/HT
 - WordPress/CRM write: disabled
 - R&D must not create Product ID, Product Family Code, Product Type Code, Canonical Model, Market Variant, Sellable SKU, Serial, or Asset
 
+## Agent model policy
+
+Role routing is defined in `apps-script/ht-pd-rd-v1/AgentModelPolicy.gs`.
+
+| Agent group | OpenAI model | reasoning.effort |
+| --- | --- | --- |
+| BA, PO, PM, CMO | `gpt-5.6-sol` | `xhigh` |
+| DEV, Content Creator, Designer | `gpt-5.5` | `medium` |
+| Other agents in team MKT | `gpt-5.5` | `xhigh` |
+
+Resolution is fail-closed and uses explicit role mapping before the generic team fallback. The OpenAI execution adapter uses the Responses API and reads the API key only from Script Property `RD_AGENT_OPENAI_API_KEY`; the key must never be committed or written to Sheet/audit logs.
+
 ## Delivery order
 
 1. Backend/workflow correctness
