@@ -10,8 +10,10 @@ Backend gate evidence:
 - Product Master read-only; CRM/WordPress writes remain disabled.
 
 UX release:
-- Replace broken legacy shell that raised ReferenceError getKpis_ is not defined.
-- Deploy canonical Code.gs + DashboardService.gs + Index.html + Client.html + Styles.html from Hai-hatien/hatien-product-rd.
-- Mobile-first UX target: Hôm nay cần quyết gì? / Cần duyệt / AI Market Scout / Tạo yêu cầu 2 bước / Hồ sơ R&D / Thư viện.
+- Canonical mobile UX was deployed at version 12.
+- Firefox runtime exposed generated inline-handler syntax errors caused by nested double quotes around JSON.stringify IDs.
+- Client.html fixed to emit single-quoted onclick attributes around JSON string arguments.
+- CI run 33150915229 PASS including Browser client parse and generated-handler contract, backend behavior contracts, and P0 source contracts.
+- This deployment is allowed only after that browser-client contract PASS.
 
-TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T12:36+07:00
+TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T14:19+07:00
