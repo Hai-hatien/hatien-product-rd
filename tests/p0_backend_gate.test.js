@@ -106,7 +106,8 @@ mustContain('UatBackendTestService.gs', [
 ]);
 
 mustContain('DashboardService.gs', ['getBootstrapData', 'getKpis_', 'getRuntimeStatusForUi_', 'getCaseDetail']);
-mustContain('Code.gs', ['doGet()', "include_('Styles')"].filter(Boolean));
+mustContain('Code.gs', ['function doGet()', 'function include_']);
+mustContain('Index.html', ["include_('Styles')", "include_('Client')", 'Hôm nay cần quyết gì?']);
 
 const deploy = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'apps-script-deploy.yml'), 'utf8');
 assert(deploy.includes("test -f .backend-uat-deploy-ready"), 'deploy must fail closed without backend marker');
