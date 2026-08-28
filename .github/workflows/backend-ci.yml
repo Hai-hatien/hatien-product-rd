@@ -31,6 +31,8 @@ jobs:
             cp "$f" "/tmp/ht-pd-rd-js/$(basename "${f%.gs}").js"
           done
           for f in /tmp/ht-pd-rd-js/*.js; do node --check "$f"; done
+      - name: Browser client parse and generated-handler contract
+        run: node tests/client_ui_contract.test.js
       - name: Backend behavior contracts
         run: node tests/backend_behavior.test.js
       - name: P0 backend gate source contracts
