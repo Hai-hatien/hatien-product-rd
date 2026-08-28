@@ -25,20 +25,43 @@ jobs:
     environment: uat
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install pinned clasp
         run: npm install --global '@google/clasp@3.4.0'
-      - name: Load OAuth
+
+      - name: Require dedicated Runtime Execution API credential
         env:
-          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_RUNTIME_JSON: ${{ secrets.CLASP_RUNTIME_JSON }}
+          RUNTIME_GCP_PROJECT_ID: ${{ secrets.RUNTIME_GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
-          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON'; exit 1; }
-          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          test -n "${CLASP_RUNTIME_JSON:-}" || {
+            echo 'Missing CLASP_RUNTIME_JSON. Runtime UAT requires OAuth created from the SAME standard Google Cloud project attached to the Apps Script project.'
+            exit 1
+          }
+          test -n "${RUNTIME_GCP_PROJECT_ID:-}" || {
+            echo 'Missing RUNTIME_GCP_PROJECT_ID. Runtime UAT requires the shared standard Google Cloud Project ID.'
+            exit 1
+          }
+          printf '%s' "$CLASP_RUNTIME_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
-          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > .clasp.json
+          printf '{"scriptId":"%s","rootDir":".","projectId":"%s"}\n' "$APPS_SCRIPT_ID" "$RUNTIME_GCP_PROJECT_ID" > .clasp.json
+          clasp show-authorized-user --json > /tmp/runtime-user.json
+          node - <<'NODE'
+          const x=require('/tmp/runtime-user.json');
+          const email=x.email||x.user?.email||x.authorizedUser?.email||'UNKNOWN';
+          if (email !== 'gpt@hatiencorp.vn') {
+            console.error('RUNTIME_AUTH_USER_MISMATCH='+email);
+            process.exit(1);
+          }
+          console.log('RUNTIME_AUTH_USER='+email);
+          NODE
+          echo 'RUNTIME_AUTH_PRECHECK=PASS'
+
       - name: Check whether Gemini migration secret is available without exposing it
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -48,6 +71,7 @@ jobs:
           else
             echo 'GITHUB_GEMINI_MIGRATION_SECRET=NOT_AVAILABLE'
           fi
+
       - name: Execute runtime prerequisite verifier through Apps Script Execution API
         run: |
           set -euo pipefail
