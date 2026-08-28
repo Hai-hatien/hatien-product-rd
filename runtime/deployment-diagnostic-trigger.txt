@@ -1,0 +1,4 @@
+HT-PD-RD deployment diagnostic
+Triggered: 2026-08-28
+Target Script ID: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
+Mode: read-only
