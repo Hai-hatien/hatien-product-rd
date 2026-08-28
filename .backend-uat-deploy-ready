@@ -1,13 +1,17 @@
-HT-PD-RD-V1 BACKEND UAT DEPLOY READY
+HT-PD-RD-V1 CANONICAL UAT DEPLOY READY
 
-Evidence before mutation:
-- Exact Script ID resolved read-only and owns existing Web App deployment: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
-- Existing deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
-- OAuth account: gpt@hatiencorp.vn
-- Read-only deployment diagnostic 33142668550 PASS on 2026-08-28: clasp pull PASS + two deployments listed for exact target.
-- Runtime Execution API now works through dedicated standard GCP project ha-tien-product-rd.
-- This deploy fixes canonical Script ID transcription and 96_Runtime_Config header parsing.
-- Deploy workflow preserves current Code.js and HTML UX shell while replacing backend JS with canonical backend.
-- UI deployment remains frozen until backend runtime UAT passes.
+Backend gate evidence:
+- Exact Script ID: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
+- Existing Web App deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
+- Deploy run 33142829536 PASS: canonical backend pushed and deployment updated to Apps Script version 11.
+- Runtime prerequisites PASS: AUD-20260828-0007; Gemini configured; 9 R0-R8 triggers installed; flow schedule and ID integrity PASS.
+- Behavioral UAT PASS: RUN-BACKEND-UAT-20260828-74278C1C / AUD-20260828-0016; 12/12 checks PASS; failures=[].
+- R1/R2/R3 fan-out after M0 verified at 06:30.
+- Product Master read-only; CRM/WordPress writes remain disabled.
 
-TRIGGER_CANONICAL_BACKEND_DEPLOY=2026-08-28T11:46+07:00
+UX release:
+- Replace broken legacy shell that raised ReferenceError getKpis_ is not defined.
+- Deploy canonical Code.gs + DashboardService.gs + Index.html + Client.html + Styles.html from Hai-hatien/hatien-product-rd.
+- Mobile-first UX target: Hôm nay cần quyết gì? / Cần duyệt / AI Market Scout / Tạo yêu cầu 2 bước / Hồ sơ R&D / Thư viện.
+
+TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T12:36+07:00
