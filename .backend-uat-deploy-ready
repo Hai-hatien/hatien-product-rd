@@ -9,11 +9,11 @@ Backend gate evidence:
 - R1/R2/R3 fan-out after M0 verified at 06:30.
 - Product Master read-only; CRM/WordPress writes remain disabled.
 
-UX release:
-- Canonical mobile UX was deployed at version 12.
-- Firefox runtime exposed generated inline-handler syntax errors caused by nested double quotes around JSON.stringify IDs.
-- Client.html fixed to emit single-quoted onclick attributes around JSON string arguments.
-- CI run 33150915229 PASS including Browser client parse and generated-handler contract, backend behavior contracts, and P0 source contracts.
-- This deployment is allowed only after that browser-client contract PASS.
+UX release evidence:
+- Version 13 fixed Firefox generated-handler syntax errors.
+- Runtime review then exposed a functional defect: request-level decision cards rendered a Mở hồ sơ button with empty RD_CASE_ID, so the click visibly did nothing.
+- Client.html now routes request-level cards to Xem yêu cầu, renders real request detail, and exposes direct actions for RESEARCH_GATE, M0_INPUT_CONFIRMATION, WORK_PRIORITY_SELECTION, and FAMILY_SCOPE_CONFIRMATION when authorized.
+- CI run 33151845761 PASS: browser parse + generated handlers + button-action contract + backend behavior + P0 source contracts.
+- No deployment is allowed before that PASS.
 
-TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T14:19+07:00
+TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T14:33+07:00
