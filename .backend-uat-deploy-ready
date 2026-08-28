@@ -4,9 +4,10 @@ Evidence before mutation:
 - Exact Script ID resolved read-only and owns existing Web App deployment: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
 - Existing deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
 - OAuth account: gpt@hatiencorp.vn
-- Diagnostic run 32962087142 PASS: exact target ownership + remote callable surface inspected read-only.
-- Backend CI run 32962891267 PASS after adding domain-only executionApi for runtime UAT.
-- Deploy workflow preserves current Code.js and HTML UX shell while replacing legacy backend JS with canonical backend.
+- Read-only deployment diagnostic 33142668550 PASS on 2026-08-28: clasp pull PASS + two deployments listed for exact target.
+- Runtime Execution API now works through dedicated standard GCP project ha-tien-product-rd.
+- This deploy fixes canonical Script ID transcription and 96_Runtime_Config header parsing.
+- Deploy workflow preserves current Code.js and HTML UX shell while replacing backend JS with canonical backend.
 - UI deployment remains frozen until backend runtime UAT passes.
 
-TRIGGER_CANONICAL_BACKEND_DEPLOY=2026-08-26T11:22Z
+TRIGGER_CANONICAL_BACKEND_DEPLOY=2026-08-28T11:46+07:00
