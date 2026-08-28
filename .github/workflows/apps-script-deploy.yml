@@ -1,4 +1,4 @@
-name: HT-PD-RD Canonical Backend UAT Deploy
+name: HT-PD-RD Canonical UAT Deploy
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ht-pd-rd-canonical-backend-uat
+  group: ht-pd-rd-canonical-uat
   cancel-in-progress: false
 
 env:
@@ -23,48 +23,46 @@ env:
   CANONICAL_BRANCH: 'backend/v1.3-hardening'
 
 jobs:
-  deploy-backend-uat:
+  deploy-uat:
     runs-on: ubuntu-latest
     environment: uat
     steps:
-      - name: Checkout triggering canonical source
+      - name: Checkout canonical source
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Enforce P0 backend gate and canonical source
+      - name: Enforce canonical source
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = "$CANONICAL_REPOSITORY"
           test "$GITHUB_REF_NAME" = "$CANONICAL_BRANCH"
-          if grep -R --line-number --fixed-strings 'Hai-hatien/hatien-digital-platform' apps-script/ht-pd-rd-v1; then
-            echo 'Legacy hatien-digital-platform runtime source is forbidden.'
+          if grep -R --line-number --fixed-strings 'Hai-hatien/hatien-digital-platform' "$ROOT_DIR"; then
+            echo 'Legacy runtime source is forbidden.'
             exit 1
           fi
-          test -f .backend-uat-deploy-ready || {
-            echo 'P0 gate closed: .backend-uat-deploy-ready is absent. No Apps Script push will occur.'
-            exit 1
-          }
+          test -f .backend-uat-deploy-ready
 
-      - name: Validate backend runtime package completeness
+      - name: Validate runtime and UX package
         run: |
           set -euo pipefail
-          for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs AutomationService.gs appsscript.json; do
-            test -f "$ROOT_DIR/$f" || { echo "Missing required backend runtime file: $f"; exit 1; }
+          for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs AutomationService.gs DashboardService.gs Code.gs Index.html Client.html Styles.html appsscript.json; do
+            test -f "$ROOT_DIR/$f" || { echo "Missing canonical file: $f"; exit 1; }
           done
           for handler in runR1Scheduled runR2Scheduled runR3Scheduled runR4Scheduled runR5Scheduled runR6Scheduled runR7Scheduled runR8Scheduled runR0DailySummary; do
             grep -R -q "function ${handler}" "$ROOT_DIR" || { echo "Missing runtime handler: $handler"; exit 1; }
           done
+          grep -q 'Hôm nay cần quyết gì?' "$ROOT_DIR/Index.html"
+          grep -q 'getBootstrapData' "$ROOT_DIR/DashboardService.gs"
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install pinned clasp
         run: npm install --global '@google/clasp@3.4.0'
 
-      - name: Load OAuth credential fail-closed
+      - name: Load deploy OAuth fail-closed
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
         run: |
@@ -73,7 +71,7 @@ jobs:
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
 
-      - name: Pull exact target and verify deployment ownership before mutation
+      - name: Pull exact target and verify deployment ownership
         run: |
           set -euo pipefail
           rm -rf remote-script
@@ -83,36 +81,33 @@ jobs:
           test -f remote-script/appsscript.json
           (cd remote-script && clasp list-deployments) | tee /tmp/target-deployments.log
           grep -F "$APPS_SCRIPT_DEPLOYMENT_ID" /tmp/target-deployments.log
-          test -f remote-script/Code.js || { echo 'Remote Code.js missing; refusing to break existing Web App shell.'; exit 1; }
-          test -f remote-script/Index.html || { echo 'Remote Index.html missing; refusing to break existing Web App UI.'; exit 1; }
-          test -f remote-script/Client.html || { echo 'Remote Client.html missing; refusing to break existing Web App UI.'; exit 1; }
-          test -f remote-script/Styles.html || { echo 'Remote Styles.html missing; refusing to break existing Web App UI.'; exit 1; }
           echo 'TARGET_OWNERSHIP_PRECHECK=PASS'
 
-      - name: Build backend-only overlay while preserving current UX shell
+      - name: Build canonical Apps Script package
         run: |
           set -euo pipefail
-          find remote-script -maxdepth 1 -type f -name '*.js' ! -name 'Code.js' -delete
+          find remote-script -maxdepth 1 -type f -name '*.js' -delete
           for src in "$ROOT_DIR"/*.gs; do
             base="$(basename "${src%.gs}")"
             cp "$src" "remote-script/${base}.js"
           done
           cp "$ROOT_DIR/appsscript.json" remote-script/appsscript.json
+          cp "$ROOT_DIR/Index.html" remote-script/Index.html
+          cp "$ROOT_DIR/Client.html" remote-script/Client.html
+          cp "$ROOT_DIR/Styles.html" remote-script/Styles.html
           test -f remote-script/Code.js
+          test -f remote-script/DashboardService.js
           test -f remote-script/Index.html
           test -f remote-script/Client.html
           test -f remote-script/Styles.html
-          test -f remote-script/WorkflowService.js
-          test -f remote-script/UatBackendTestService.js
-          test -f remote-script/AutomationService.js
           if grep -R -q --include='*.js' 'OPENAI_API_KEY\|api.openai.com\|runDailyRdOrchestrator' remote-script; then
-            echo 'Forbidden legacy runtime detected in merged Apps Script source.'
+            echo 'Forbidden legacy runtime detected.'
             exit 1
           fi
-          echo "MERGED_JS_COUNT=$(find remote-script -maxdepth 1 -type f -name '*.js' | wc -l | tr -d ' ')"
-          echo "PRESERVED_HTML_COUNT=$(find remote-script -maxdepth 1 -type f -name '*.html' | wc -l | tr -d ' ')"
+          echo "CANONICAL_JS_COUNT=$(find remote-script -maxdepth 1 -type f -name '*.js' | wc -l | tr -d ' ')"
+          echo "CANONICAL_HTML_COUNT=$(find remote-script -maxdepth 1 -type f -name '*.html' | wc -l | tr -d ' ')"
 
-      - name: Push canonical backend overlay to exact Apps Script target
+      - name: Push canonical source to exact Apps Script target
         working-directory: remote-script
         run: clasp push --force
 
@@ -121,7 +116,7 @@ jobs:
         working-directory: remote-script
         run: |
           set -euo pipefail
-          OUT="$(clasp create-version "HT-PD-RD canonical backend ${GITHUB_SHA}" 2>&1)"
+          OUT="$(clasp create-version "HT-PD-RD canonical UAT ${GITHUB_SHA}" 2>&1)"
           echo "$OUT"
           VERSION="$(printf '%s' "$OUT" | grep -Eo '[0-9]+' | tail -1)"
           test -n "$VERSION" || { echo 'Could not parse Apps Script version.'; exit 1; }
@@ -134,7 +129,7 @@ jobs:
           clasp create-deployment \
             --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" \
             --versionNumber "${{ steps.version.outputs.number }}" \
-            --description "HT-PD-RD canonical backend ${GITHUB_SHA}"
+            --description "HT-PD-RD canonical UAT ${GITHUB_SHA}"
 
       - name: Verify deployment coordinate
         working-directory: remote-script
@@ -145,4 +140,4 @@ jobs:
           echo "CANONICAL_SOURCE_SHA=$GITHUB_SHA"
           echo "APPS_SCRIPT_VERSION=${{ steps.version.outputs.number }}"
           echo "WEB_APP=https://script.google.com/a/macros/hatiencorp.vn/s/${APPS_SCRIPT_DEPLOYMENT_ID}/exec"
-          echo 'UX_SHELL_PRESERVED=YES'
+          echo 'CANONICAL_MOBILE_UX_DEPLOYED=YES'
