@@ -5,15 +5,20 @@ const assert = require('assert');
 
 const ROOT = path.join(process.cwd(), 'apps-script', 'ht-pd-rd-v1');
 const policySource = fs.readFileSync(path.join(ROOT, 'AgentModelPolicy.gs'), 'utf8');
+const registrySource = fs.readFileSync(path.join(ROOT, 'AgentRegistry.gs'), 'utf8');
 const openAiSource = fs.readFileSync(path.join(ROOT, 'OpenAiAgentService.gs'), 'utf8');
 
 const context = { console, JSON, String, Number, Object, Array, Error };
 vm.createContext(context);
 vm.runInContext(policySource, context, { filename: 'AgentModelPolicy.gs' });
+vm.runInContext(registrySource, context, { filename: 'AgentRegistry.gs' });
 vm.runInContext(openAiSource, context, { filename: 'OpenAiAgentService.gs' });
 
 function route(agent) {
   return vm.runInContext(`resolveAgentModel_(${JSON.stringify(agent)})`, context);
+}
+function registered(agentId) {
+  return vm.runInContext(`getRegisteredAgentRuntime_(${JSON.stringify(agentId)})`, context);
 }
 
 for (const role of ['BA', 'PO', 'PM', 'CMO']) {
@@ -49,7 +54,33 @@ assert.strictEqual(designerInMkt.model, 'gpt-5.5');
 assert.strictEqual(designerInMkt.reasoningEffort, 'medium');
 assert.strictEqual(designerInMkt.source, 'ROLE');
 
+for (const id of ['BA', 'PO', 'PM', 'CMO']) {
+  const actual = registered(id);
+  assert.strictEqual(actual.model, 'gpt-5.6-sol', id + ' registered model');
+  assert.strictEqual(actual.reasoningEffort, 'xhigh', id + ' registered reasoning');
+}
+for (const id of ['DEV', 'CONTENT_CREATOR', 'DESIGNER']) {
+  const actual = registered(id);
+  assert.strictEqual(actual.model, 'gpt-5.5', id + ' registered model');
+  assert.strictEqual(actual.reasoningEffort, 'medium', id + ' registered reasoning');
+}
+for (const id of [
+  'MKT_MARKET_INTELLIGENCE',
+  'MKT_CUSTOMER_VOC',
+  'MKT_COMPETITOR_BENCHMARK',
+  'MKT_ACQUISITION_SIGNALS',
+  'MKT_SEO_INTENT',
+  'MKT_SOCIAL_LISTENING',
+  'MKT_PR_STRATEGY'
+]) {
+  const actual = registered(id);
+  assert.strictEqual(actual.model, 'gpt-5.5', id + ' registered model');
+  assert.strictEqual(actual.reasoningEffort, 'xhigh', id + ' registered reasoning');
+  assert.strictEqual(actual.source, 'TEAM', id + ' registered source');
+}
+
 assert.throws(() => route({ role: 'UNKNOWN_AGENT', team: 'UNKNOWN_TEAM' }), /Chưa gán model/);
+assert.throws(() => registered('NO_SUCH_AGENT'), /Không tìm thấy agent/);
 
 const request = vm.runInContext(`buildOpenAiAgentRequest_(
   {role:'BA'},
