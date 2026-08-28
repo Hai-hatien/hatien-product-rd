@@ -1,0 +1,49 @@
+name: HT-PD-RD Apps Script Deployment Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - backend/v1.3-hardening
+    paths:
+      - 'runtime/deployment-diagnostic-trigger.txt'
+      - '.github/workflows/apps-script-deployment-diagnostic.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ht-pd-rd-deployment-diagnostic
+  cancel-in-progress: false
+
+env:
+  APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'
+
+jobs:
+  deployment-diagnostic:
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pinned clasp
+        run: npm install --global '@google/clasp@3.4.0'
+      - name: Load management OAuth
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "${CLASPRC_JSON:-}" || { echo 'Missing CLASPRC_JSON'; exit 1; }
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > .clasp.json
+      - name: Verify exact project and list deployments read-only
+        run: |
+          set -euo pipefail
+          echo "TARGET_SCRIPT_ID=$APPS_SCRIPT_ID"
+          clasp show-authorized-user --json
+          clasp pull >/tmp/pull.log
+          echo 'CLASP_PULL=PASS'
+          clasp list-deployments | tee /tmp/deployments.txt
