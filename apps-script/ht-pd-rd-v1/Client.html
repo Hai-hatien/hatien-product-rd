@@ -85,13 +85,38 @@ function renderDecisionList(card) {
 }
 
 function renderDecisionCard(card) {
-  let actions = "<button class=\"button secondary\" onclick='openRelatedCase(" + JSON.stringify(card.rdCaseId || '') + ")'>Mở hồ sơ</button>";
+  const permissions = (appData && appData.actor && appData.actor.permissions) || {};
+  let actions = '';
+
+  if (card.rdCaseId) {
+    actions += "<button class=\"button secondary\" onclick='openRelatedCase(" + JSON.stringify(card.rdCaseId) + ")'>Mở hồ sơ</button>";
+  } else if (card.rdRequestId) {
+    actions += "<button class=\"button secondary\" onclick='openRequestDetail(" + JSON.stringify(card.rdRequestId) + ")'>Xem yêu cầu</button>";
+  } else {
+    actions += '<button class="button secondary" disabled>Chưa có hồ sơ liên kết</button>';
+  }
+
   if (card.cardType === 'RESEARCH_REQUEST' && card.canApprove) {
-    actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
+    if (card.canSetPriority) {
+      actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
+    }
     actions += "<button class=\"button\" onclick='approveResearchCard(" + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ")'>Duyệt nghiên cứu</button>";
   }
-  if (card.cardType === 'OPEN_DECISION' && card.decisionType === 'M0_INPUT_CONFIRMATION' && card.canApprove) {
-    actions += "<button class=\"button\" onclick='confirmM0(" + JSON.stringify(card.decisionId) + ")'>Xác nhận M0</button>";
+
+  if (card.cardType === 'OPEN_DECISION' && card.canApprove) {
+    if (card.decisionType === 'RESEARCH_GATE' && card.rdRequestId) {
+      actions += "<button class=\"button\" onclick='approveResearchOpenDecision(" + JSON.stringify(card.rdRequestId) + ")'>Duyệt nghiên cứu</button>";
+    }
+    if (card.decisionType === 'M0_INPUT_CONFIRMATION' && card.decisionId) {
+      actions += "<button class=\"button\" onclick='confirmM0(" + JSON.stringify(card.decisionId) + ")'>Xác nhận M0</button>";
+    }
+    if (card.decisionType === 'WORK_PRIORITY_SELECTION' && permissions.setPriority && card.decisionId) {
+      actions += `<select id="open-priority-${attr(card.id)}" class="priority-select"><option value="">Chọn P0-P3</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
+      actions += "<button class=\"button\" onclick='resolvePriorityDecision(" + JSON.stringify(card.decisionId) + ',' + JSON.stringify(card.id) + ")'>Xác nhận ưu tiên</button>";
+    }
+    if (card.decisionType === 'FAMILY_SCOPE_CONFIRMATION' && permissions.assignFamily && card.decisionId) {
+      actions += "<button class=\"button\" onclick='resolveFamilyDecision(" + JSON.stringify(card.decisionId) + ")'>Xác nhận dòng sản phẩm</button>";
+    }
   }
 
   return `<article class="decision-card">
@@ -110,16 +135,87 @@ function fact(label, value) {
   return '<div class="fact"><span>' + esc(label) + '</span><strong>' + esc(String(value || '—')) + '</strong></div>';
 }
 
+function openRequestDetail(requestId) {
+  const request = ((appData && appData.requests) || []).find(row => String(row.RD_REQUEST_ID || '') === String(requestId));
+  if (!request) {
+    showError(new Error('Không tìm thấy yêu cầu ' + requestId + ' trong dữ liệu hiện tại.'));
+    return;
+  }
+  const box = document.getElementById('requestDetail');
+  if (!box) {
+    showError(new Error('Thiếu vùng hiển thị chi tiết yêu cầu.'));
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(request.RD_REQUEST_ID)}</span><h3>${esc(request.REQUEST_TITLE || request.RD_REQUEST_ID)}</h3><p>${esc(statusLabel(request.REQUEST_STATUS || ''))}</p></div></div>
+    <div class="decision-facts">
+      ${fact('Dòng sản phẩm', request.TARGET_PRODUCT || 'CHƯA BIẾT')}
+      ${fact('Thị trường', request.TARGET_MARKET || 'CHƯA BIẾT')}
+      ${fact('Khách hàng / use case', request.TARGET_CUSTOMER || 'CHƯA BIẾT')}
+      ${fact('Pain', request.CUSTOMER_PAIN || 'CHƯA BIẾT')}
+      ${fact('Mục tiêu', request.TARGET_OUTCOMES || 'CHƯA BIẾT')}
+      ${fact('Ràng buộc', request.CONSTRAINTS || 'CHƯA BIẾT')}
+      ${fact('Ưu tiên', request.WORK_PRIORITY || 'CHƯA CHỌN')}
+      ${fact('Nguồn bằng chứng', request.SOURCE_URL_OR_FILE || 'CHƯA CÓ')}
+    </div>`;
+  showViewByName('approvals');
+  if (box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function approveResearchCard(requestId, cardId) {
   const priority = (document.getElementById('priority-' + cardId) || {}).value || '';
   const reason = window.prompt('Ghi chú quyết định (có thể để trống):', '') || '';
   setNotice('Đang ghi quyết định…');
   try {
-    if (priority) await gas('setRequestPriority', requestId, priority, reason);
+    if (priority) await gas('setRequestPriority', requestId, priority, reason || 'Xác nhận ưu tiên từ Dashboard UAT');
     await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
     await reloadData();
     showViewByName('cases');
     setNotice('Đã duyệt nghiên cứu.');
+  } catch (error) { showError(error); }
+}
+
+async function approveResearchOpenDecision(requestId) {
+  const reason = window.prompt('Lý do duyệt nghiên cứu:', 'Đủ điều kiện bắt đầu nghiên cứu UAT') || '';
+  setNotice('Đang duyệt nghiên cứu…');
+  try {
+    await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
+    await reloadData();
+    showViewByName('cases');
+    setNotice('Đã duyệt nghiên cứu.');
+  } catch (error) { showError(error); }
+}
+
+async function resolvePriorityDecision(decisionId, cardId) {
+  const priority = (document.getElementById('open-priority-' + cardId) || {}).value || '';
+  if (!priority) {
+    showError(new Error('Chọn P0-P3 trước khi xác nhận.'));
+    return;
+  }
+  const reason = window.prompt('Lý do chọn ' + priority + ':', 'Xác nhận ưu tiên từ Dashboard UAT') || '';
+  if (!reason.trim()) {
+    showError(new Error('Cần ghi lý do quyết định ưu tiên.'));
+    return;
+  }
+  setNotice('Đang xác nhận ưu tiên…');
+  try {
+    await gas('resolveOpenDecision', { decisionId, priority, reason });
+    await reloadData();
+    setNotice('Đã xác nhận ưu tiên ' + priority + '.');
+  } catch (error) { showError(error); }
+}
+
+async function resolveFamilyDecision(decisionId) {
+  const reason = window.prompt('Ghi lý do xác nhận dòng sản phẩm:', 'Xác nhận phạm vi sản phẩm từ Dashboard UAT') || '';
+  if (!reason.trim()) {
+    showError(new Error('Cần ghi lý do xác nhận dòng sản phẩm.'));
+    return;
+  }
+  setNotice('Đang xác nhận dòng sản phẩm…');
+  try {
+    await gas('resolveOpenDecision', { decisionId, reason });
+    await reloadData();
+    setNotice('Đã xác nhận dòng sản phẩm.');
   } catch (error) { showError(error); }
 }
 
@@ -156,7 +252,11 @@ async function loadCase(caseId) {
 }
 
 function openRelatedCase(caseId) {
-  if (caseId) loadCase(caseId); else showViewByName('approvals');
+  if (caseId) {
+    loadCase(caseId);
+    return;
+  }
+  showError(new Error('Hồ sơ R&D chưa được tạo cho mục này. Hãy mở yêu cầu hoặc thực hiện quyết định tương ứng.'));
 }
 
 function renderCandidates(cards) {
