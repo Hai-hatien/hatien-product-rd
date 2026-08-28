@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <?!= include_('Styles'); ?>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand-kicker">HÀ TIÊN</div>
+      <h1>Product R&D Command Center</h1>
+      <p id="subtitle">Đang tải dữ liệu…</p>
+    </div>
+    <div class="header-actions">
+      <span id="runtimeBadge" class="badge muted">Hệ thống</span>
+      <button class="button secondary compact" type="button" onclick="reloadData()">Làm mới</button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Điều hướng">
+      <button class="nav-item active" data-view="overview" onclick="showView('overview',this)">⌂ <span>Tổng quan</span></button>
+      <button class="nav-item" data-view="request" onclick="showView('request',this)">＋ <span>Tạo yêu cầu</span></button>
+      <button class="nav-item" data-view="approvals" onclick="showView('approvals',this)">✓ <span>Cần duyệt</span></button>
+      <button class="nav-item" data-view="cases" onclick="showView('cases',this)">▤ <span>Hồ sơ R&D</span></button>
+      <button class="nav-item" data-view="library" onclick="showView('library',this)">▦ <span>Thư viện</span></button>
+      <button id="techNav" class="nav-item hidden" data-view="technical" onclick="showView('technical',this)">⚙ <span>Kỹ thuật</span></button>
+    </aside>
+
+    <main class="content">
+      <section id="notice" class="notice hidden"></section>
+
+      <section id="view-overview" class="view active">
+        <div class="hero">
+          <div>
+            <span class="eyebrow">TỔNG QUAN ĐIỀU HÀNH R&D</span>
+            <h2>Hôm nay cần quyết gì?</h2>
+            <p>Chỉ hiện việc cần quyết định, blocker và hồ sơ đang chạy.</p>
+          </div>
+          <button class="button primary" type="button" onclick="showViewByName('request')">+ Tạo yêu cầu R&D mới</button>
+        </div>
+
+        <div id="kpiCards" class="kpi-grid"></div>
+
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">CẦN ANH HẢI DUYỆT</span>
+              <h3>Việc cần quyết định</h3>
+              <p>Ưu tiên việc đến hạn và việc đang chặn luồng.</p>
+            </div>
+            <button class="link-button" onclick="showViewByName('approvals')">Xem tất cả</button>
+          </div>
+          <div id="overviewDecisions" class="card-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">AI MARKET SCOUT</span>
+              <h3>Đề xuất R&D mới</h3>
+              <p>Ứng viên từ tín hiệu thị trường; chưa phải Product Master.</p>
+            </div>
+            <button class="link-button" onclick="showViewByName('library')">Mở thư viện</button>
+          </div>
+          <div id="overviewCandidates" class="candidate-list"></div>
+        </div>
+
+        <div class="panel">
+          <span class="eyebrow">CẬP NHẬT TUẦN</span>
+          <h3>Điều cần theo dõi</h3>
+          <div id="weeklySummary" class="summary-lines"></div>
+        </div>
+      </section>
+
+      <section id="view-request" class="view">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">YÊU CẦU NGHIÊN CỨU SẢN PHẨM</span>
+            <h2>Tạo yêu cầu R&D</h2>
+            <p>Gửi yêu cầu chỉ tạo trạng thái REQUESTED; chưa tự duyệt thành dự án.</p>
+          </div>
+          <span id="requestStepBadge" class="step-badge">BƯỚC 1/2</span>
+        </div>
+
+        <form id="requestForm" class="panel form-grid" onsubmit="submitRequest(event)">
+          <div class="request-step span-2" data-step="1">
+            <h3>Đề bài, khách hàng và thị trường</h3>
+            <label class="span-2">Tên đề bài
+              <input name="requestTitle" required placeholder="Ví dụ: Fryer hồi nhiệt nhanh cho bếp trung tâm">
+            </label>
+            <label>Dòng sản phẩm
+              <select name="targetProduct" required>
+                <option>Fryer công nghiệp</option>
+                <option>SẢN PHẨM MỚI - CHƯA CÓ DÒNG</option>
+                <option>KHÁC / TÙY CHỈNH</option>
+              </select>
+            </label>
+            <label>Loại yêu cầu
+              <select name="requestKind" required>
+                <option value="IMPROVEMENT">Cải tiến hiện hữu</option>
+                <option value="CUSTOM_VARIANT">Tùy chỉnh</option>
+                <option value="NEW_PRODUCT">Sản phẩm mới</option>
+              </select>
+            </label>
+            <label class="span-2">Khách hàng / use case
+              <input name="targetCustomer" required placeholder="Bếp trung tâm / Chuỗi F&B / Nhà máy…">
+            </label>
+            <label class="span-2">Nỗi đau cần giải quyết
+              <textarea name="customerPain" rows="4" required placeholder="Mô tả vấn đề vận hành thực tế"></textarea>
+            </label>
+            <label class="span-2">Thị trường
+              <input name="targetMarket" required placeholder="Việt Nam / Úc / Mỹ / Khác">
+            </label>
+            <div class="form-actions span-2">
+              <button type="reset" class="button secondary">Xóa</button>
+              <button type="button" class="button" onclick="setRequestStep(2)">Tiếp tục</button>
+            </div>
+          </div>
+
+          <div class="request-step span-2 hidden" data-step="2">
+            <h3>Mục tiêu, ràng buộc và bằng chứng</h3>
+            <label class="span-2">Mục tiêu kỹ thuật
+              <textarea name="targetOutcomes" rows="4" placeholder="Năng suất, hồi nhiệt, điện/gas, vệ sinh, an toàn…"></textarea>
+            </label>
+            <label>Giới hạn kích thước
+              <input name="sizeLimit" placeholder="Dài × rộng × cao tối đa">
+            </label>
+            <label>Nguồn năng lượng
+              <select name="energySource">
+                <option>CHƯA BIẾT</option><option>GAS</option><option>ELECTRIC</option><option>BOTH</option>
+              </select>
+            </label>
+            <label>Ngân sách mục tiêu
+              <input name="targetBudget" placeholder="CHƯA BIẾT hoặc mức mục tiêu">
+            </label>
+            <label>Ngày cần quyết định
+              <input name="decisionDueDate" type="date">
+            </label>
+            <label class="span-2">Link nguồn / tệp bằng chứng
+              <input name="sourceRef" placeholder="Drive URL, spec, video, phản hồi khách hàng…">
+            </label>
+            <label class="span-2">Ràng buộc khác
+              <textarea name="constraints" rows="3" placeholder="CHƯA BIẾT nếu chưa xác định"></textarea>
+            </label>
+            <input type="hidden" name="sourceType" value="INTERNAL_REQUEST">
+            <div class="form-actions span-2 sticky-action">
+              <button type="button" class="button secondary" onclick="setRequestStep(1)">Quay lại</button>
+              <button type="submit" class="button">Gửi yêu cầu</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section id="view-approvals" class="view">
+        <div class="section-heading"><div><span class="eyebrow">CẦN DUYỆT</span><h2>Thẻ quyết định</h2><p>Đọc pain, bằng chứng và trạng thái trước khi duyệt.</p></div></div>
+        <div id="approvalCards" class="decision-grid"></div>
+      </section>
+
+      <section id="view-cases" class="view">
+        <div class="section-heading"><div><span class="eyebrow">HỒ SƠ R&D</span><h2>Hồ sơ đang nghiên cứu</h2></div></div>
+        <div id="caseList" class="card-list"></div>
+        <div id="caseDetail" class="panel hidden"></div>
+      </section>
+
+      <section id="view-library" class="view">
+        <div class="section-heading"><div><span class="eyebrow">THƯ VIỆN R&D</span><h2>Đề xuất và hồ sơ</h2><p>Phân biệt rõ AI đề xuất, yêu cầu nội bộ và hồ sơ đang R&D.</p></div></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="ALL" onclick="setLibraryTab('ALL',this)">Tất cả</button>
+          <button class="tab" data-tab="AI_PROPOSAL" onclick="setLibraryTab('AI_PROPOSAL',this)">AI đề xuất</button>
+          <button class="tab" data-tab="IN_RD" onclick="setLibraryTab('IN_RD',this)">Đang R&D</button>
+          <button class="tab" data-tab="WAITING_APPROVAL" onclick="setLibraryTab('WAITING_APPROVAL',this)">Chờ duyệt</button>
+        </div>
+        <div id="candidateLibrary" class="candidate-list"></div>
+      </section>
+
+      <section id="view-technical" class="view">
+        <div class="section-heading"><div><span class="eyebrow">UAT KỸ THUẬT</span><h2>Trạng thái hệ thống</h2></div></div>
+        <div id="runtimeSummary" class="panel"></div>
+        <div class="panel">
+          <div class="form-actions">
+            <button class="button secondary" onclick="verifyRuntime()">Kiểm tra runtime</button>
+            <button class="button secondary" onclick="runBehavioralUat()">Chạy backend UAT</button>
+          </div>
+          <pre id="technicalOutput">Chưa chạy kiểm tra.</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Điều hướng di động">
+    <button class="active" data-view="overview" onclick="showView('overview',this)">⌂<span>Tổng quan</span></button>
+    <button data-view="request" onclick="showView('request',this)">＋<span>Tạo mới</span></button>
+    <button data-view="approvals" onclick="showView('approvals',this)">✓<span>Cần duyệt</span></button>
+    <button data-view="library" onclick="showView('library',this)">▦<span>Thư viện</span></button>
+  </nav>
+
+  <?!= include_('Client'); ?>
+</body>
+</html>
