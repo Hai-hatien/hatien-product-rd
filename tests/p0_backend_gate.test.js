@@ -105,17 +105,23 @@ mustContain('UatBackendTestService.gs', [
   "FLOW_ID: 'BACKEND_UAT_GATE'"
 ]);
 
+mustContain('DashboardService.gs', ['getBootstrapData', 'getKpis_', 'getRuntimeStatusForUi_', 'getCaseDetail']);
+mustContain('Code.gs', ['doGet()', "include_('Styles')"].filter(Boolean));
+
 const deploy = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'apps-script-deploy.yml'), 'utf8');
 assert(deploy.includes("test -f .backend-uat-deploy-ready"), 'deploy must fail closed without backend marker');
 assert(deploy.includes('workflow_dispatch'), 'canonical deployment must retain explicit manual dispatch');
 assert(deploy.includes("- '.backend-uat-deploy-ready'"), 'push deploy trigger must be scoped only to backend UAT marker');
-assert(deploy.includes("APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'"), 'deploy must use read-only verified lowercase-l Script ID');
+assert(deploy.includes("APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'"), 'deploy must use verified lowercase-l Script ID');
 assert(deploy.includes('TARGET_OWNERSHIP_PRECHECK=PASS'), 'deploy must verify target deployment ownership before mutation');
-assert(deploy.includes("! -name 'Code.js' -delete"), 'deploy must preserve Web App Code.js shell while replacing backend JS');
-assert(deploy.includes('UX_SHELL_PRESERVED=YES'), 'deploy evidence must state frozen UX shell preservation');
+assert(deploy.includes("find remote-script -maxdepth 1 -type f -name '*.js' -delete"), 'post-backend release deploy must rebuild canonical JS package');
+assert(deploy.includes('cp "$ROOT_DIR/Index.html" remote-script/Index.html'), 'canonical UI Index must be deployed');
+assert(deploy.includes('cp "$ROOT_DIR/Client.html" remote-script/Client.html'), 'canonical UI Client must be deployed');
+assert(deploy.includes('cp "$ROOT_DIR/Styles.html" remote-script/Styles.html'), 'canonical UI Styles must be deployed');
+assert(deploy.includes('CANONICAL_MOBILE_UX_DEPLOYED=YES'), 'deploy evidence must state canonical mobile UX deployment');
 
 const uiPreview = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'apps-script-ui-preview.yml'), 'utf8');
-assert(uiPreview.includes('FROZEN BY BACKEND P0'), 'UI preview must remain frozen');
-assert(!uiPreview.includes('clasp push'), 'frozen UI preview must not contain a push step');
+assert(uiPreview.includes('FROZEN BY BACKEND P0'), 'legacy preview workflow remains non-mutating');
+assert(!uiPreview.includes('clasp push'), 'legacy preview workflow must not push');
 
 console.log('P0 backend gate source contracts: PASS');
