@@ -85,13 +85,13 @@ function renderDecisionList(card) {
 }
 
 function renderDecisionCard(card) {
-  let actions = '<button class="button secondary" onclick="openRelatedCase(' + JSON.stringify(card.rdCaseId || '') + ')">Mở hồ sơ</button>';
+  let actions = "<button class=\"button secondary\" onclick='openRelatedCase(" + JSON.stringify(card.rdCaseId || '') + ")'>Mở hồ sơ</button>";
   if (card.cardType === 'RESEARCH_REQUEST' && card.canApprove) {
     actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
-    actions += '<button class="button" onclick="approveResearchCard(' + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ')">Duyệt nghiên cứu</button>';
+    actions += "<button class=\"button\" onclick='approveResearchCard(" + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ")'>Duyệt nghiên cứu</button>";
   }
   if (card.cardType === 'OPEN_DECISION' && card.decisionType === 'M0_INPUT_CONFIRMATION' && card.canApprove) {
-    actions += '<button class="button" onclick="confirmM0(' + JSON.stringify(card.decisionId) + ')">Xác nhận M0</button>';
+    actions += "<button class=\"button\" onclick='confirmM0(" + JSON.stringify(card.decisionId) + ")'>Xác nhận M0</button>";
   }
 
   return `<article class="decision-card">
@@ -137,7 +137,7 @@ function renderCases(cases) {
   const el = document.getElementById('caseList');
   el.innerHTML = cases.length ? cases.map(row => `<article class="item-card">
     <div><span class="eyebrow">${esc(row.RD_CASE_ID || '')}</span><h4>${esc(row.CASE_TITLE || row.RD_CASE_ID)}</h4><p>${esc(statusLabel(row.CURRENT_STAGE))} • ${esc(statusLabel(row.CASE_STATUS))} • ${esc(row.WORK_PRIORITY || 'Chưa có ưu tiên')}</p></div>
-    <button class="button secondary" onclick="loadCase(${JSON.stringify(row.RD_CASE_ID)})">Mở</button>
+    <button class="button secondary" onclick='loadCase(${JSON.stringify(row.RD_CASE_ID)})'>Mở</button>
   </article>`).join('') : emptyState('Chưa có hồ sơ R&D.');
 }
 
@@ -178,7 +178,7 @@ function renderCandidate(card) {
     <div class="candidate-line"><b>Pain:</b> ${esc(card.pain || 'CHƯA BIẾT')}</div>
     <div class="candidate-line"><b>Giá trị:</b> ${esc(card.value || 'CHƯA CÓ DỮ LIỆU')}</div>
     <div class="candidate-line"><b>Bằng chứng:</b> ${esc(String(card.evidenceCount || 0))} nguồn/mục</div></div>
-    ${card.rdCaseId ? '<button class="button secondary" onclick="loadCase(' + JSON.stringify(card.rdCaseId) + ')">Mở hồ sơ</button>' : ''}
+    ${card.rdCaseId ? "<button class=\"button secondary\" onclick='loadCase(" + JSON.stringify(card.rdCaseId) + ")'>Mở hồ sơ</button>" : ''}
   </article>`;
 }
 
@@ -241,7 +241,7 @@ function setNotice(message) { const el = document.getElementById('notice'); el.t
 function hideNotice() { const el = document.getElementById('notice'); el.className = 'notice hidden'; }
 function showError(error) { const el = document.getElementById('notice'); el.textContent = (error && error.message) || String(error); el.className = 'notice error'; }
 function emptyState(text) { return '<div class="empty-state">' + esc(text) + '</div>'; }
-function statusLabel(value) { return String(value || '—').replaceAll('_', ' '); }
+function statusLabel(value) { return String(value || '—').replace(/_/g, ' '); }
 function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function attr(value) { return String(value == null ? '' : value).replace(/[^a-zA-Z0-9_-]/g, '-'); }
 </script>
