@@ -1,0 +1,247 @@
+<script>
+let appData = null;
+let activeLibraryTab = 'ALL';
+
+document.addEventListener('DOMContentLoaded', reloadData);
+
+function gas(method, ...args) {
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[method](...args);
+  });
+}
+
+async function reloadData() {
+  setNotice('Đang tải dữ liệu…');
+  try {
+    const data = await gas('getBootstrapData');
+    appData = data;
+    renderApp();
+    hideNotice();
+  } catch (error) {
+    showError(error);
+  }
+}
+
+function renderApp() {
+  const data = appData || {};
+  if (data.restricted) {
+    document.querySelector('.content').innerHTML = '<div class="notice error">' + esc(data.message || 'Không có quyền truy cập') + '</div>';
+    return;
+  }
+
+  const actor = data.actor || {};
+  document.getElementById('subtitle').textContent = (actor.displayName || actor.email || 'Người dùng') + ' • ' + (data.project && data.project.environment ? data.project.environment : 'UAT');
+  document.getElementById('techNav').classList.toggle('hidden', !(actor.permissions && actor.permissions.technicalOperate));
+  renderRuntime(data.runtime || {});
+  renderKpis(data.kpis || {});
+  renderDecisions(data.decisionCards || []);
+  renderCases(data.cases || []);
+  renderCandidates(data.candidateLibrary || []);
+  renderWeekly(data.weeklyPack || {});
+}
+
+function renderRuntime(runtime) {
+  const ready = Boolean(runtime.triggerInstalled && runtime.aiConfigured);
+  const badge = document.getElementById('runtimeBadge');
+  badge.className = 'badge ' + (ready ? 'ok' : 'warn');
+  badge.textContent = ready ? 'Hệ thống sẵn sàng' : 'Hệ thống chưa đủ';
+  document.getElementById('runtimeSummary').innerHTML = `
+    <div class="runtime-grid">
+      ${runtimeItem('Lịch', runtime.schedule || '—')}
+      ${runtimeItem('Trigger R0-R8', runtime.triggerInstalled ? 'Đã cài (' + (runtime.triggerCount || 0) + ')' : 'Chưa đủ')}
+      ${runtimeItem('Gemini', runtime.aiConfigured ? 'Đã cấu hình • ' + (runtime.aiModel || '') : 'Chưa cấu hình')}
+      ${runtimeItem('Lần chạy gần nhất', runtime.lastDailyRunAt || 'CHƯA CÓ')}
+    </div>`;
+}
+
+function runtimeItem(label, value) {
+  return '<div class="runtime-item"><span>' + esc(label) + '</span><strong>' + esc(String(value || '—')) + '</strong></div>';
+}
+
+function renderKpis(kpis) {
+  const cards = [
+    ['Cần duyệt', kpis.openDecisionCount || 0, 'Việc chờ quyết định'],
+    ['Blocker P0/P1', kpis.blockerP0P1Count || 0, 'Phải gỡ trước'],
+    ['Đang R&D', kpis.activeCaseCount || 0, 'Hồ sơ đang chạy'],
+    ['Độ phủ bằng chứng', kpis.evidenceCoverage == null ? '—' : kpis.evidenceCoverage + '%', 'Theo hồ sơ']
+  ];
+  document.getElementById('kpiCards').innerHTML = cards.map((c, i) => `
+    <article class="kpi-card ${i === 1 && Number(c[1]) > 0 ? 'alert' : ''}">
+      <span>${esc(c[0])}</span><strong>${esc(String(c[1]))}</strong><small>${esc(c[2])}</small>
+    </article>`).join('');
+}
+
+function renderDecisions(cards) {
+  const top = cards.slice(0, 4);
+  document.getElementById('overviewDecisions').innerHTML = top.length ? top.map(renderDecisionList).join('') : emptyState('Không có việc cần duyệt.');
+  document.getElementById('approvalCards').innerHTML = cards.length ? cards.map(renderDecisionCard).join('') : emptyState('Không có việc cần duyệt.');
+}
+
+function renderDecisionList(card) {
+  return `<article class="item-card">
+    <div><span class="eyebrow">${esc(card.gateLabel || 'QUYẾT ĐỊNH')}</span><h4>${esc(card.title || card.id)}</h4><p>${esc(card.subtitle || '')}</p></div>
+    <button class="button secondary" onclick="showViewByName('approvals')">Xem</button>
+  </article>`;
+}
+
+function renderDecisionCard(card) {
+  let actions = '<button class="button secondary" onclick="openRelatedCase(' + JSON.stringify(card.rdCaseId || '') + ')">Mở hồ sơ</button>';
+  if (card.cardType === 'RESEARCH_REQUEST' && card.canApprove) {
+    actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
+    actions += '<button class="button" onclick="approveResearchCard(' + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ')">Duyệt nghiên cứu</button>';
+  }
+  if (card.cardType === 'OPEN_DECISION' && card.decisionType === 'M0_INPUT_CONFIRMATION' && card.canApprove) {
+    actions += '<button class="button" onclick="confirmM0(' + JSON.stringify(card.decisionId) + ')">Xác nhận M0</button>';
+  }
+
+  return `<article class="decision-card">
+    <div class="decision-head"><div><span class="eyebrow">${esc(card.gateLabel || '')}</span><h3>${esc(card.title || card.id)}</h3><p>${esc(card.subtitle || '')}</p></div><span class="badge warn">${esc(statusLabel(card.status))}</span></div>
+    <div class="decision-facts">
+      ${fact('Khách hàng', card.customer || 'CHƯA BIẾT')}
+      ${fact('Pain / phạm vi', card.problem || 'CHƯA CÓ DỮ LIỆU')}
+      ${fact('Bằng chứng', card.evidence || 'CHƯA CÓ')}
+      ${fact('Khuyến nghị', card.recommendation || 'MỞ HỒ SƠ')}
+    </div>
+    <div class="form-actions">${actions}</div>
+  </article>`;
+}
+
+function fact(label, value) {
+  return '<div class="fact"><span>' + esc(label) + '</span><strong>' + esc(String(value || '—')) + '</strong></div>';
+}
+
+async function approveResearchCard(requestId, cardId) {
+  const priority = (document.getElementById('priority-' + cardId) || {}).value || '';
+  const reason = window.prompt('Ghi chú quyết định (có thể để trống):', '') || '';
+  setNotice('Đang ghi quyết định…');
+  try {
+    if (priority) await gas('setRequestPriority', requestId, priority, reason);
+    await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
+    await reloadData();
+    showViewByName('cases');
+    setNotice('Đã duyệt nghiên cứu.');
+  } catch (error) { showError(error); }
+}
+
+async function confirmM0(decisionId) {
+  if (!window.confirm('Xác nhận bộ M0 hiện tại và mở R1/R2/R3 song song?')) return;
+  setNotice('Đang xác nhận M0…');
+  try {
+    await gas('resolveOpenDecision', { decisionId, decision: 'CONFIRMED_M0', reason: 'Xác nhận từ Dashboard R&D UAT' });
+    await reloadData();
+    setNotice('M0 đã xác nhận. R1/R2/R3 được mở song song.');
+  } catch (error) { showError(error); }
+}
+
+function renderCases(cases) {
+  const el = document.getElementById('caseList');
+  el.innerHTML = cases.length ? cases.map(row => `<article class="item-card">
+    <div><span class="eyebrow">${esc(row.RD_CASE_ID || '')}</span><h4>${esc(row.CASE_TITLE || row.RD_CASE_ID)}</h4><p>${esc(statusLabel(row.CURRENT_STAGE))} • ${esc(statusLabel(row.CASE_STATUS))} • ${esc(row.WORK_PRIORITY || 'Chưa có ưu tiên')}</p></div>
+    <button class="button secondary" onclick="loadCase(${JSON.stringify(row.RD_CASE_ID)})">Mở</button>
+  </article>`).join('') : emptyState('Chưa có hồ sơ R&D.');
+}
+
+async function loadCase(caseId) {
+  setNotice('Đang tải hồ sơ…');
+  try {
+    const detail = await gas('getCaseDetail', caseId);
+    const box = document.getElementById('caseDetail');
+    box.classList.remove('hidden');
+    box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(caseId)}</span><h3>${esc(detail.caseRecord.CASE_TITLE || caseId)}</h3></div></div>
+      <div class="case-stats">${fact('Giai đoạn', statusLabel(detail.caseRecord.CURRENT_STAGE))}${fact('Trạng thái', statusLabel(detail.caseRecord.CASE_STATUS))}${fact('Market', detail.market.length + ' mục')}${fact('VOC', detail.voc.length + ' mục')}${fact('Benchmark', detail.benchmark.length + ' mục')}${fact('Bằng chứng', detail.evidence.length + ' mục')}</div>
+      <div class="table-wrap"><table><thead><tr><th>Bước</th><th>Công việc</th><th>Trạng thái</th></tr></thead><tbody>${detail.tasks.map(t => `<tr><td>${esc(t.SUBFLOW_ID)}</td><td>${esc(t.TASK_TITLE)}</td><td>${esc(statusLabel(t.STATUS))}</td></tr>`).join('')}</tbody></table></div>`;
+    showViewByName('cases');
+    hideNotice();
+  } catch (error) { showError(error); }
+}
+
+function openRelatedCase(caseId) {
+  if (caseId) loadCase(caseId); else showViewByName('approvals');
+}
+
+function renderCandidates(cards) {
+  const ai = cards.filter(c => c.statusGroup === 'AI_PROPOSAL').slice(0, 3);
+  document.getElementById('overviewCandidates').innerHTML = ai.length ? ai.map(renderCandidate).join('') : emptyState('Chưa có đề xuất AI mới.');
+  renderLibrary();
+}
+
+function renderLibrary() {
+  const cards = (appData && appData.candidateLibrary) || [];
+  const filtered = activeLibraryTab === 'ALL' ? cards : cards.filter(c => c.statusGroup === activeLibraryTab);
+  document.getElementById('candidateLibrary').innerHTML = filtered.length ? filtered.map(renderCandidate).join('') : emptyState('Chưa có dữ liệu ở nhóm này.');
+}
+
+function renderCandidate(card) {
+  return `<article class="candidate-card">
+    <div><div class="candidate-meta"><span>${esc(card.origin === 'AI' ? 'AI đề xuất' : 'Yêu cầu nội bộ')}</span><span>${esc(statusLabel(card.stage || card.statusGroup))}</span></div>
+    <h4>${esc(card.title || card.candidateId)}</h4><p>${esc(card.customer || 'CHƯA BIẾT')}</p>
+    <div class="candidate-line"><b>Pain:</b> ${esc(card.pain || 'CHƯA BIẾT')}</div>
+    <div class="candidate-line"><b>Giá trị:</b> ${esc(card.value || 'CHƯA CÓ DỮ LIỆU')}</div>
+    <div class="candidate-line"><b>Bằng chứng:</b> ${esc(String(card.evidenceCount || 0))} nguồn/mục</div></div>
+    ${card.rdCaseId ? '<button class="button secondary" onclick="loadCase(' + JSON.stringify(card.rdCaseId) + ')">Mở hồ sơ</button>' : ''}
+  </article>`;
+}
+
+function setLibraryTab(tab, button) {
+  activeLibraryTab = tab;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  if (button) button.classList.add('active');
+  renderLibrary();
+}
+
+function renderWeekly(pack) {
+  const lines = pack.lines || [];
+  document.getElementById('weeklySummary').innerHTML = lines.length ? lines.map(line => '<div>• ' + esc(line) + '</div>').join('') : '<div>Chưa có dữ liệu tuần.</div>';
+}
+
+function setRequestStep(step) {
+  document.querySelectorAll('.request-step').forEach(el => el.classList.toggle('hidden', Number(el.dataset.step) !== Number(step)));
+  document.getElementById('requestStepBadge').textContent = 'BƯỚC ' + step + '/2';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function submitRequest(event) {
+  event.preventDefault();
+  const form = event.target;
+  const payload = Object.fromEntries(new FormData(form).entries());
+  const extra = [payload.sizeLimit && 'Kích thước: ' + payload.sizeLimit, payload.energySource && 'Năng lượng: ' + payload.energySource, payload.targetBudget && 'Ngân sách: ' + payload.targetBudget].filter(Boolean).join(' | ');
+  payload.constraints = [payload.constraints, extra].filter(Boolean).join(' | ') || 'CHƯA BIẾT';
+  setNotice('Đang tạo yêu cầu…');
+  try {
+    const result = await gas('createRdRequest', payload);
+    form.reset();
+    setRequestStep(1);
+    await reloadData();
+    showViewByName('approvals');
+    setNotice('Đã tạo ' + result.requestId + '.');
+  } catch (error) { showError(error); }
+}
+
+async function verifyRuntime() {
+  document.getElementById('technicalOutput').textContent = 'Đang kiểm tra…';
+  try { document.getElementById('technicalOutput').textContent = JSON.stringify(await gas('verifyRuntimePrerequisites'), null, 2); }
+  catch (error) { document.getElementById('technicalOutput').textContent = error.message || String(error); }
+}
+
+async function runBehavioralUat() {
+  document.getElementById('technicalOutput').textContent = 'Đang chạy backend UAT…';
+  try { document.getElementById('technicalOutput').textContent = JSON.stringify(await gas('runBackendUatGateTests'), null, 2); await reloadData(); }
+  catch (error) { document.getElementById('technicalOutput').textContent = error.message || String(error); }
+}
+
+function showView(name, button) {
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  if (button) button.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showViewByName(name) { showView(name, null); }
+
+function setNotice(message) { const el = document.getElementById('notice'); el.textContent = message; el.className = 'notice'; }
+function hideNotice() { const el = document.getElementById('notice'); el.className = 'notice hidden'; }
+function showError(error) { const el = document.getElementById('notice'); el.textContent = (error && error.message) || String(error); el.className = 'notice error'; }
+function emptyState(text) { return '<div class="empty-state">' + esc(text) + '</div>'; }
+function statusLabel(value) { return String(value || '—').replaceAll('_', ' '); }
+function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function attr(value) { return String(value == null ? '' : value).replace(/[^a-zA-Z0-9_-]/g, '-'); }
+</script>
