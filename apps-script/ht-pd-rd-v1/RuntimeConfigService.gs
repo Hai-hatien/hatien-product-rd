@@ -1,5 +1,20 @@
 function runtimeConfigRows_() {
-  return readObjects_(RD_CONFIG.SHEETS.RUNTIME_CONFIG);
+  const sheet = getSheet_(RD_CONFIG.SHEETS.RUNTIME_CONFIG);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return [];
+
+  const headerRowIndex = values.findIndex(row =>
+    row.some(cell => String(cell || '').trim() === 'CONFIG_KEY')
+  );
+  if (headerRowIndex < 0) {
+    throw new Error('96_Runtime_Config không tìm thấy header CONFIG_KEY.');
+  }
+
+  const headers = values[headerRowIndex].map(value => String(value || '').trim());
+  return values
+    .slice(headerRowIndex + 1)
+    .filter(row => row.some(value => value !== '' && value !== null))
+    .map(row => Object.fromEntries(headers.map((header, index) => [header, row[index]])));
 }
 
 function runtimeConfigByKey_() {
