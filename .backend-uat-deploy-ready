@@ -1,19 +1,19 @@
 HT-PD-RD-V1 CANONICAL UAT DEPLOY READY
 
+Release: Gemini scheduled worker V1
+
 Backend gate evidence:
+- Canonical source commit: ae0ebebc279c170f45dbcc66e589266484058f1c
+- CI run 33237216005 PASS: syntax, agent mapping, Gemini worker, UI, backend behavior and P0 contracts.
 - Exact Script ID: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
 - Existing Web App deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
-- Deploy run 33142829536 PASS: canonical backend pushed and deployment updated to Apps Script version 11.
-- Runtime prerequisites PASS: AUD-20260828-0007; Gemini configured; 9 R0-R8 triggers installed; flow schedule and ID integrity PASS.
-- Behavioral UAT PASS: RUN-BACKEND-UAT-20260828-74278C1C / AUD-20260828-0016; 12/12 checks PASS; failures=[].
-- R1/R2/R3 fan-out after M0 verified at 06:30.
+- Worker handoff: READY -> Gemini call -> 20_Flow_Reports -> HANDOFF_READY.
+- No automatic gate approval, test PASS, Product ID, model or SKU issuance.
+- Product-code source lock: Kế hoạch HTG - STG - HTC 2026; absent codes remain UNKNOWN.
 - Product Master read-only; CRM/WordPress writes remain disabled.
 
-UX release evidence:
-- Version 13 fixed Firefox generated-handler syntax errors.
-- Runtime review then exposed a functional defect: request-level decision cards rendered a Mở hồ sơ button with empty RD_CASE_ID, so the click visibly did nothing.
-- Client.html now routes request-level cards to Xem yêu cầu, renders real request detail, and exposes direct actions for RESEARCH_GATE, M0_INPUT_CONFIRMATION, WORK_PRIORITY_SELECTION, and FAMILY_SCOPE_CONFIRMATION when authorized.
-- CI run 33151845761 PASS: browser parse + generated handlers + button-action contract + backend behavior + P0 source contracts.
-- No deployment is allowed before that PASS.
+Rollback:
+- Previous deployed Apps Script version: 11
+- Previous canonical deployed source SHA: ab2cad73968cd466ba24cd5ea54ff255bfe0e40a
 
-TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-28T14:33+07:00
+TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-29T12:54+07:00
