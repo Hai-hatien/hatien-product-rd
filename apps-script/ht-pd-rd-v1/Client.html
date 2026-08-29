@@ -30,7 +30,7 @@ function renderApp() {
   }
 
   const actor = data.actor || {};
-  document.getElementById('subtitle').textContent = (actor.displayName || actor.email || 'Người dùng') + ' • ' + (data.project && data.project.environment ? data.project.environment : 'UAT');
+  document.getElementById('subtitle').textContent = (actor.displayName || actor.email || 'Người dùng') + ' • ' + (data.project && data.project.environment ? data.project.environment : 'PRODUCTION');
   document.getElementById('techNav').classList.toggle('hidden', !(actor.permissions && actor.permissions.technicalOperate));
   renderRuntime(data.runtime || {});
   renderKpis(data.kpis || {});

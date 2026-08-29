@@ -4,16 +4,16 @@
  */
 const RD_CONFIG = Object.freeze({
   PROJECT_CODE: 'HT-PD-RD-V1',
-  VERSION: '1.3.1',
-  ENVIRONMENT: 'UAT',
+  VERSION: '1.3.4-go-live-v1',
+  ENVIRONMENT: 'PRODUCTION',
   SPREADSHEET_ID: '1PzJe_DHC6PosnFxsMw1B_2m6MUgS_3VsgUc993VKDas',
   PROJECT_FOLDER_ID: '10YpAvJSbvq-AMRWeHE0pgDds9Yp0C-ty',
   EVIDENCE_FOLDER_ID: '1AEmuUcGGywZ2B9cMjJDmGcO64MSI8bil',
   TIME_ZONE: 'Asia/Ho_Chi_Minh',
 
-  FINAL_APPROVER: 'ht@hatiencorp.vn',
+  FINAL_APPROVER: 'gpt@hatiencorp.vn',
   TECHNICAL_OPERATORS: Object.freeze(['gpt@hatiencorp.vn']),
-  TEMP_UAT_HAI_PROXY_EMAILS: Object.freeze(['gpt@hatiencorp.vn']),
+  TEMP_UAT_HAI_PROXY_EMAILS: Object.freeze([]),
   PRIORITY_PRODUCT_SCOPE: 'Fryer công nghiệp',
   PRODUCT_MASTER_MODE: 'READ_ONLY',
   WORDPRESS_CONNECTION: 'DISABLED',
@@ -40,7 +40,7 @@ const RD_CONFIG = Object.freeze({
   }),
 
   ALLOWED_USERS: Object.freeze({
-    'ht@hatiencorp.vn': Object.freeze({
+    'gpt@hatiencorp.vn': Object.freeze({
       displayName: 'Anh Hải',
       roleCode: 'PRODUCT_AUTHORITY',
       createRequest: true,
@@ -48,16 +48,6 @@ const RD_CONFIG = Object.freeze({
       setPriority: true,
       approveGate: true,
       finalApprove: true,
-      technicalOperate: false
-    }),
-    'gpt@hatiencorp.vn': Object.freeze({
-      displayName: 'CMO / R&D Coordinator',
-      roleCode: 'CMO_GATE_APPROVER',
-      createRequest: true,
-      assignFamily: false,
-      setPriority: false,
-      approveGate: true,
-      finalApprove: false,
       technicalOperate: true
     }),
     'youtube1@hatiencorp.vn': Object.freeze({

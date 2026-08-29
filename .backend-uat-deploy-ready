@@ -1,19 +1,19 @@
-HT-PD-RD-V1 CANONICAL UAT DEPLOY READY
+HT-PD-RD-V1 GO-LIVE V1 DEPLOY READY
 
-Release: Gemini scheduled worker V1
+Release: Production identity consolidation — gpt@hatiencorp.vn
 
-Backend gate evidence:
-- Canonical source commit: ae0ebebc279c170f45dbcc66e589266484058f1c
-- CI run 33237216005 PASS: syntax, agent mapping, Gemini worker, UI, backend behavior and P0 contracts.
-- Exact Script ID: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
-- Existing Web App deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy
-- Worker handoff: READY -> Gemini call -> 20_Flow_Reports -> HANDOFF_READY.
+Go-live evidence:
+- Parent source commit: 953042cbc59a40d74aea925bbd864167c4aec205
+- Identity: gpt@hatiencorp.vn is the only PRODUCT_AUTHORITY, final approver and technical operator.
+- Environment: PRODUCTION; TEMP_UAT proxy retired.
+- Gemini Worker V1 runtime proof: RUN-R1-20260829-6C1F90F6.
+- Worker handoff remains READY -> Gemini -> 20_Flow_Reports -> HANDOFF_READY.
 - No automatic gate approval, test PASS, Product ID, model or SKU issuance.
 - Product-code source lock: Kế hoạch HTG - STG - HTC 2026; absent codes remain UNKNOWN.
 - Product Master read-only; CRM/WordPress writes remain disabled.
 
 Rollback:
-- Previous deployed Apps Script version: 11
-- Previous canonical deployed source SHA: ab2cad73968cd466ba24cd5ea54ff255bfe0e40a
+- Previous deployed Apps Script version: 15
+- Previous canonical deployed source SHA: af2f8d698a4117979b2db77248cd7fad08be3c92
 
-TRIGGER_CANONICAL_UAT_DEPLOY=2026-08-29T12:54+07:00
+TRIGGER_CANONICAL_GO_LIVE_DEPLOY=2026-08-29T14:25+07:00

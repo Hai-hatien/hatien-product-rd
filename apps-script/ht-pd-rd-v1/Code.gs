@@ -5,7 +5,7 @@ function onOpen() {
       .addItem('Mở Dashboard R&D', 'showWebAppLink')
       .addItem('Kiểm tra runtime', 'showRuntimeCheckFromMenu')
       .addSeparator()
-      .addItem('Cài lịch R0-R8 UAT', 'installRdTriggersFromMenu')
+      .addItem('Cài lịch R0-R8', 'installRdTriggersFromMenu')
       .addToUi();
   } catch (error) {
     console.log('Không có Spreadsheet UI ở phiên chạy này: ' + error.message);

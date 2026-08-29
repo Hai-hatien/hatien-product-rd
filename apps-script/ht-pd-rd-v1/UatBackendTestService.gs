@@ -59,13 +59,14 @@ function runBackendUatGateTests() {
   const results = [];
   const state = { requestId: '', caseId: '', priorityOpenDecisionId: '', priorityResultDecisionId: '', marketRunId: '' };
 
-  uatCheck_('permission matrix ht/gpt/youtube1/unknown fail-closed', () => {
-    const ht = getActorContextForEmail_('ht@hatiencorp.vn');
+  uatCheck_('permission matrix gpt/youtube1/unknown fail-closed', () => {
     const gpt = getActorContextForEmail_('gpt@hatiencorp.vn');
     const mkt = getActorContextForEmail_('youtube1@hatiencorp.vn');
     const unknown = getActorContextForEmail_('unknown-uat@hatiencorp.vn');
-    if (!ht.allowed || !ht.permissions.setPriority || !ht.permissions.finalApprove) throw new Error('ht permission mismatch');
-    if (!gpt.allowed || !gpt.permissions.technicalOperate || !gpt.permissions.approveGate || !gpt.uatHaiProxy) throw new Error('gpt UAT permission mismatch');
+    if (!gpt.allowed || !gpt.permissions.technicalOperate || !gpt.permissions.setPriority ||
+        !gpt.permissions.approveGate || !gpt.permissions.finalApprove || gpt.uatHaiProxy) {
+      throw new Error('gpt production permission mismatch');
+    }
     if (!mkt.allowed || !mkt.permissions.createRequest || mkt.permissions.setPriority || mkt.permissions.approveGate) throw new Error('youtube1 permission mismatch');
     if (unknown.allowed) throw new Error('unknown user did not fail closed');
     return 'PASS';

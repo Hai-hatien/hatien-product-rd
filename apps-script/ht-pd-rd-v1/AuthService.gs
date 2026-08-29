@@ -1,6 +1,5 @@
-function isUatHaiProxyEmail_(email) {
-  return RD_CONFIG.ENVIRONMENT === 'UAT' &&
-    RD_CONFIG.TEMP_UAT_HAI_PROXY_EMAILS.includes(String(email || '').trim().toLowerCase());
+function isUatHaiProxyEmail_() {
+  return false;
 }
 
 function getActorContextForEmail_(emailInput) {
@@ -14,17 +13,17 @@ function getActorContextForEmail_(emailInput) {
     return { email, displayName: email, roleCode: 'VIEWER', permissions: {}, allowed: false,
       reason: 'Tài khoản chưa nằm trong danh sách được cấp quyền.' };
   }
-  const uatHaiProxy = isUatHaiProxyEmail_(email);
+  const uatHaiProxy = false;
   return {
     email,
-    displayName: uatHaiProxy ? 'CMO / R&D Coordinator — TEMP_UAT thay quyền Anh Hải' : user.displayName,
-    roleCode: uatHaiProxy ? 'PRODUCT_AUTHORITY_UAT' : user.roleCode,
+    displayName: user.displayName,
+    roleCode: user.roleCode,
     permissions: {
       createRequest: Boolean(user.createRequest),
-      assignFamily: uatHaiProxy || Boolean(user.assignFamily),
-      setPriority: uatHaiProxy || Boolean(user.setPriority),
-      approveGate: uatHaiProxy || Boolean(user.approveGate),
-      finalApprove: uatHaiProxy || Boolean(user.finalApprove),
+      assignFamily: Boolean(user.assignFamily),
+      setPriority: Boolean(user.setPriority),
+      approveGate: Boolean(user.approveGate),
+      finalApprove: Boolean(user.finalApprove),
       technicalOperate: Boolean(user.technicalOperate)
     },
     allowed: true,
@@ -51,8 +50,8 @@ function requirePermission_(permission) {
 
 function requireHai_() {
   const actor = requireAllowedActor_();
-  if (actor.email !== RD_CONFIG.FINAL_APPROVER && !actor.uatHaiProxy) {
-    throw new Error('Thao tác này chỉ Anh Hải được thực hiện; TEMP_UAT chỉ cho phép proxy đã cấu hình.');
+  if (actor.email !== RD_CONFIG.FINAL_APPROVER) {
+    throw new Error('Thao tác này chỉ tài khoản Anh Hải đã cấu hình được thực hiện.');
   }
   return actor;
 }

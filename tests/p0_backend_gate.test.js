@@ -24,7 +24,9 @@ mustContain('Config.gs', [
   "API_KEY_PROPERTY: 'GEMINI_API_KEY'",
   "MODEL_PROPERTY: 'GEMINI_MODEL'",
   "RESEARCH_FLOWS: Object.freeze(['R1', 'R2', 'R3'])",
-  "TEMP_UAT_HAI_PROXY_EMAILS: Object.freeze(['gpt@hatiencorp.vn'])"
+  "ENVIRONMENT: 'PRODUCTION'",
+  "FINAL_APPROVER: 'gpt@hatiencorp.vn'",
+  "TEMP_UAT_HAI_PROXY_EMAILS: Object.freeze([])"
 ]);
 mustNotContain('Config.gs', ['OPENAI_API_KEY', 'api.openai.com']);
 
@@ -106,7 +108,7 @@ mustContain('OpenAiAgentService.gs', ['RETIRED_NOT_USED']);
 mustNotContain('OpenAiAgentService.gs', ['OPENAI_API_KEY', 'api.openai.com']);
 
 mustContain('UatBackendTestService.gs', [
-  'permission matrix ht/gpt/youtube1/unknown fail-closed',
+  'permission matrix gpt/youtube1/unknown fail-closed',
   'create request',
   'set priority append-only decision chain',
   'M0 confirmation releases R1/R2/R3 simultaneously',
