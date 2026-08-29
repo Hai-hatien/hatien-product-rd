@@ -107,12 +107,13 @@ test('MKT can create request but cannot set priority or approve gates', () => {
   assert.equal(actor.permissions.finalApprove, false);
 });
 
-test('CMO keeps technical/gate permission and gets explicit TEMP_UAT Hải proxy only in UAT', () => {
+test('gpt production identity holds product authority, technical and final approval permissions', () => {
   const actor = actorFor('gpt@hatiencorp.vn');
   assert.equal(actor.allowed, true);
+  assert.equal(actor.roleCode, 'PRODUCT_AUTHORITY');
   assert.equal(actor.permissions.technicalOperate, true);
   assert.equal(actor.permissions.approveGate, true);
-  assert.equal(actor.uatHaiProxy, true);
+  assert.equal(actor.uatHaiProxy, false);
   assert.equal(actor.permissions.setPriority, true);
   assert.equal(actor.permissions.finalApprove, true);
 });
