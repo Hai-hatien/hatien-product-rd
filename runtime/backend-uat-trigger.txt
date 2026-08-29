@@ -1,3 +1,6 @@
-Run HT-PD-RD Apps Script runtime prerequisite verifier after deployment version 10.
+Run HT-PD-RD Apps Script runtime verifier and one real Gemini worker cycle.
 Target Script ID: 1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL
-Deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy @10
+Deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy @15
+Canonical deployed source SHA: af2f8d698a4117979b2db77248cd7fad08be3c92
+Expected proof: API_STATUS=CALLED and at least one 20_Flow_Reports row.
+TRIGGER_RUNTIME_GEMINI_WORKER_V1=2026-08-29T12:56+07:00

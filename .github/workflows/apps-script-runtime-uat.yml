@@ -59,16 +59,6 @@ jobs:
           NODE
           echo 'RUNTIME_AUTH_PRECHECK=PASS'
 
-      - name: Check whether Gemini migration secret is available without exposing it
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          if [ -n "${GEMINI_API_KEY:-}" ]; then
-            echo 'GITHUB_GEMINI_MIGRATION_SECRET=AVAILABLE'
-          else
-            echo 'GITHUB_GEMINI_MIGRATION_SECRET=NOT_AVAILABLE'
-          fi
-
       - name: Execute runtime prerequisite verifier through Apps Script Execution API
         run: |
           set -euo pipefail
@@ -77,20 +67,42 @@ jobs:
           RC=$?
           set -e
           printf '%s\n' "$OUT" | tee /tmp/runtime-prereq.txt
-
           if [ "$RC" -ne 0 ]; then
             echo "RUNTIME_PREREQ_EXECUTION=FAIL clasp_exit=$RC"
             exit "$RC"
           fi
-
           if printf '%s\n' "$OUT" | grep -Eqi 'Unable to run script function|permission to run the script function|NOT_AUTHORIZED|PERMISSION_DENIED|Exception:|Error:'; then
             echo 'RUNTIME_PREREQ_EXECUTION=FAIL api_error_detected'
             exit 1
           fi
-
           if ! printf '%s\n' "$OUT" | grep -Fq 'PREREQUISITES_VERIFIED'; then
             echo 'RUNTIME_PREREQ_EXECUTION=FAIL prerequisites_not_verified'
             exit 1
           fi
-
           echo 'RUNTIME_PREREQ_EXECUTION=PASS'
+
+      - name: Execute one real Gemini scheduled worker cycle
+        run: |
+          set -euo pipefail
+          set +e
+          OUT="$(clasp --user "$RUNTIME_USER_KEY" run runR1Scheduled 2>&1)"
+          RC=$?
+          set -e
+          printf '%s\n' "$OUT" | tee /tmp/runtime-worker.txt
+          if [ "$RC" -ne 0 ]; then
+            echo "GEMINI_WORKER_EXECUTION=FAIL clasp_exit=$RC"
+            exit "$RC"
+          fi
+          if printf '%s\n' "$OUT" | grep -Eqi 'Unable to run script function|permission to run the script function|NOT_AUTHORIZED|PERMISSION_DENIED|Exception:|Error:'; then
+            echo 'GEMINI_WORKER_EXECUTION=FAIL api_error_detected'
+            exit 1
+          fi
+          printf '%s\n' "$OUT" | grep -Fq 'CALLED' || {
+            echo 'GEMINI_WORKER_EXECUTION=FAIL api_not_called'
+            exit 1
+          }
+          printf '%s\n' "$OUT" | grep -Fq 'WORKER_COMPLETED' || {
+            echo 'GEMINI_WORKER_EXECUTION=FAIL worker_not_completed'
+            exit 1
+          }
+          echo 'GEMINI_WORKER_EXECUTION=PASS'
