@@ -4,4 +4,4 @@ Deployment: AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCto
 Canonical deployed source SHA: af2f8d698a4117979b2db77248cd7fad08be3c92
 Expected proof: API_STATUS=CALLED and at least one 20_Flow_Reports row.
 Credential policy: prefer CLASP_RUNTIME_JSON; fall back to the already-proven CLASPRC_JSON and verify gpt@hatiencorp.vn.
-TRIGGER_RUNTIME_GEMINI_WORKER_V1=2026-08-29T13:00+07:00
+TRIGGER_RUNTIME_GEMINI_WORKER_V1=2026-08-29T13:02+07:00

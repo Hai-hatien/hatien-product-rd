@@ -78,7 +78,10 @@ jobs:
           if [ "$CLASP_RUNTIME_AUTH_MODE" = 'DEDICATED_RUNTIME' ]; then
             OUT="$(clasp --user "$RUNTIME_USER_KEY" run verifyRuntimePrerequisites --nondev 2>&1)"
           else
-            OUT="$(clasp run verifyRuntimePrerequisites --nondev 2>&1)"
+            # The deploy credential owns/edits the bound script but is not the
+            # dedicated nondev Execution API principal. Use HEAD execution,
+            # which is also what installed time-based triggers execute.
+            OUT="$(clasp run verifyRuntimePrerequisites 2>&1)"
           fi
           RC=$?
           set -e
