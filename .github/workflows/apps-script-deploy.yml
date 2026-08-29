@@ -141,4 +141,5 @@ jobs:
           echo "CANONICAL_SOURCE_SHA=$GITHUB_SHA"
           echo "APPS_SCRIPT_VERSION=${{ steps.version.outputs.number }}"
           echo "WEB_APP=https://script.google.com/a/macros/hatiencorp.vn/s/${APPS_SCRIPT_DEPLOYMENT_ID}/exec"
+          echo 'CANONICAL_MOBILE_UX_DEPLOYED=YES'
           echo 'GEMINI_FLOW_WORKER_V1_DEPLOYED=YES'
