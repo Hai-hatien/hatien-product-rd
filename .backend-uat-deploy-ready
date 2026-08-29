@@ -52,3 +52,14 @@ Bilingual UI release evidence:
 - User-facing font standard: Be Vietnam Pro.
 - Minimum user-facing font size: 16px.
 - No Product ID, Product Family Code, Product Type Code, Canonical Model, Market Variant, Sellable SKU, Serial, Asset, CRM write, or WordPress write may be issued by this UI deploy.
+
+DEPLOY_MOBILE_OFFCANVAS_NAV=2026-08-29T17:50+07:00
+
+Mobile navigation release evidence:
+- Source commit: ebcd47a4d04da10cd13ea285597efb881854eb17.
+- Mobile sidebar must be hidden by default and opened by the three-line menu button.
+- Sidebar opens as a left sliding panel with overlay and closes on overlay, Escape, or menu selection.
+- Main content must not be compressed by the sidebar on 360px and 390px screens.
+- User-facing font standard remains Be Vietnam Pro.
+- Minimum user-facing font size remains 16px.
+- This deploy does not change business approval logic, Sheet IDs, Product Master, CRM writes, or WordPress writes.
