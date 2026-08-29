@@ -4,7 +4,7 @@
  */
 const RD_CONFIG = Object.freeze({
   PROJECT_CODE: 'HT-PD-RD-V1',
-  VERSION: '1.3.4-go-live-v1',
+  VERSION: '1.4.0-command-center-v1',
   ENVIRONMENT: 'PRODUCTION',
   SPREADSHEET_ID: '1PzJe_DHC6PosnFxsMw1B_2m6MUgS_3VsgUc993VKDas',
   PROJECT_FOLDER_ID: '10YpAvJSbvq-AMRWeHE0pgDds9Yp0C-ty',
@@ -15,6 +15,12 @@ const RD_CONFIG = Object.freeze({
   TECHNICAL_OPERATORS: Object.freeze(['gpt@hatiencorp.vn']),
   TEMP_UAT_HAI_PROXY_EMAILS: Object.freeze([]),
   PRIORITY_PRODUCT_SCOPE: 'Fryer công nghiệp',
+  PRIORITY_PRODUCT_SCOPES: Object.freeze([
+    'Fryer công nghiệp',
+    'Tủ cơm áp suất',
+    'Chảo tay quay',
+    'Nồi hầm'
+  ]),
   PRODUCT_MASTER_MODE: 'READ_ONLY',
   WORDPRESS_CONNECTION: 'DISABLED',
 
@@ -28,6 +34,35 @@ const RD_CONFIG = Object.freeze({
     familyDisplayCandidate: 'HT-FRY',
     familyReviewStatus: 'REVIEW_REQUIRED'
   }),
+
+  // Nguồn khóa: Kế hoạch HTG - STG - HTC 2026 / Mapping 226 SP.
+  // Các số bên dưới là ID dòng nguồn (FAMILY_CONTAINER), không phải mã Product/Model/SKU được phát hành.
+  PRODUCT_FAMILY_REFERENCES: Object.freeze([
+    Object.freeze({ sourceFamilyContainerId: 910502, sourceFamilyName: 'Bếp chiên / quầy ráo dầu', displayName: 'Fryer công nghiệp', sourceFamilyKey: 'SP-BEP-CHIEN-QUAY-RAO-DAU', familyTokenCandidate: 'FRY', priority: true }),
+    Object.freeze({ sourceFamilyContainerId: 910525, sourceFamilyName: 'Tủ hấp / tủ nấu cơm', displayName: 'Tủ cơm áp suất', sourceFamilyKey: 'SP-TU-HAP-TU-NAU-COM', familyTokenCandidate: 'STM', priority: true }),
+    Object.freeze({ sourceFamilyContainerId: 910432, sourceFamilyName: 'Chảo tay quay / chảo nghiêng', displayName: 'Chảo tay quay', sourceFamilyKey: 'SP-CHAO-TAY-QUAY-CHAO-NGHIENG', familyTokenCandidate: 'BP', priority: true }),
+    Object.freeze({ sourceFamilyContainerId: 910524, sourceFamilyName: 'Nồi hầm / nồi nấu canh', displayName: 'Nồi hầm', sourceFamilyKey: 'SP-NOI-HAM-NOI-NAU-CANH', familyTokenCandidate: 'KET', priority: true }),
+    Object.freeze({ sourceFamilyContainerId: 910440, sourceFamilyName: 'Bàn chậu rửa inox', displayName: 'Bàn chậu rửa inox', sourceFamilyKey: 'SP-BAN-CHAU-RUA-INOX', familyTokenCandidate: 'SNT', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910441, sourceFamilyName: 'Bàn inox có kệ', displayName: 'Bàn inox có kệ', sourceFamilyKey: 'SP-BAN-INOX-CO-KE', familyTokenCandidate: 'TBS', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910513, sourceFamilyName: 'Bàn inox không kệ', displayName: 'Bàn inox không kệ', sourceFamilyKey: 'SP-BAN-INOX-KHONG-KE', familyTokenCandidate: 'TBN', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910443, sourceFamilyName: 'Bàn inox theo yêu cầu', displayName: 'Bàn inox theo yêu cầu', sourceFamilyKey: 'SP-BAN-INOX-THEO-YEU-CAU', familyTokenCandidate: 'TBL', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910504, sourceFamilyName: 'Bẫy mỡ inox', displayName: 'Bẫy mỡ inox', sourceFamilyKey: 'SP-BAY-MO-INOX', familyTokenCandidate: 'GT', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910519, sourceFamilyName: 'Bếp nấu / line nấu', displayName: 'Bếp nấu / line nấu', sourceFamilyKey: 'SP-BEP-NAU-LINE-NAU', familyTokenCandidate: 'CKG — CATEGORY ONLY', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910437, sourceFamilyName: 'Hệ thống phụ trợ', displayName: 'Hệ thống phụ trợ', sourceFamilyKey: 'SP-HE-THONG-PHU-TRO', familyTokenCandidate: 'AUX', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910515, sourceFamilyName: 'Kệ inox', displayName: 'Kệ inox', sourceFamilyKey: 'SP-KE-INOX', familyTokenCandidate: 'RCK', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910505, sourceFamilyName: 'Khay lọc rác', displayName: 'Khay lọc rác', sourceFamilyKey: 'SP-KHAY-LOC-RAC', familyTokenCandidate: 'WSF', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910449, sourceFamilyName: 'Máy rửa / khu rửa', displayName: 'Máy rửa / khu rửa', sourceFamilyKey: 'SP-MAY-RUA-KHU-RUA', familyTokenCandidate: 'DWS', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910521, sourceFamilyName: 'Máy sơ chế thực phẩm', displayName: 'Máy sơ chế thực phẩm', sourceFamilyKey: 'SP-MAY-SO-CHE-THUC-PHAM', familyTokenCandidate: 'PRE', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910445, sourceFamilyName: 'Pallet / kê hàng', displayName: 'Pallet / kê hàng', sourceFamilyKey: 'SP-PALLET-KE-HANG', familyTokenCandidate: 'PLT', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910439, sourceFamilyName: 'Quầy bar / pha chế', displayName: 'Quầy bar / pha chế', sourceFamilyKey: 'SP-QUAY-BAR-PHA-CHE', familyTokenCandidate: 'BAR', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910451, sourceFamilyName: 'Quầy giữ nóng / chia suất', displayName: 'Quầy giữ nóng / chia suất', sourceFamilyKey: 'SP-QUAY-GIU-NONG-CHIA-SUAT', familyTokenCandidate: 'HLD', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910438, sourceFamilyName: 'Thiết bị khác cần rà soát', displayName: 'Thiết bị khác cần rà soát', sourceFamilyKey: 'SP-THIET-BI-KHAC-CAN-RA-SOAT', familyTokenCandidate: 'OTH', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910518, sourceFamilyName: 'Thiết bị lạnh / kho lạnh', displayName: 'Thiết bị lạnh / kho lạnh', sourceFamilyKey: 'SP-THIET-BI-LANH-KHO-LANH', familyTokenCandidate: 'REF', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910523, sourceFamilyName: 'Thiết bị vệ sinh và khử khuẩn', displayName: 'Thiết bị vệ sinh và khử khuẩn', sourceFamilyKey: 'SP-THIET-BI-VE-SINH-VA-KHU-KHUAN', familyTokenCandidate: 'SAN', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910435, sourceFamilyName: 'Thoát nước và phụ kiện', displayName: 'Thoát nước và phụ kiện', sourceFamilyKey: 'SP-THOAT-NUOC-VA-PHU-KIEN', familyTokenCandidate: 'DRN', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910446, sourceFamilyName: 'Tủ inox / tủ nhân viên', displayName: 'Tủ inox / tủ nhân viên', sourceFamilyKey: 'SP-TU-INOX-TU-NHAN-VIEN', familyTokenCandidate: 'CAB', priority: false }),
+    Object.freeze({ sourceFamilyContainerId: 910436, sourceFamilyName: 'Vòi rửa / vòi xịt', displayName: 'Vòi rửa / vòi xịt', sourceFamilyKey: 'SP-VOI-RUA-VOI-XIT', familyTokenCandidate: 'FCT', priority: false })
+  ]),
 
   GEMINI: Object.freeze({
     API_KEY_PROPERTY: 'GEMINI_API_KEY',

@@ -75,8 +75,14 @@ function resolveAgentModel_(agent) {
     reasoningEffort: selected.reasoningEffort,
     role: role || '',
     team: team || '',
-    source: roleProfile ? 'ROLE' : 'TEAM'
+    source: roleProfile ? 'ROLE' : 'TEAM',
+    profileCode: agentModelProfileCode_(selected.model, selected.reasoningEffort)
   };
+}
+
+function agentModelProfileCode_(model, reasoningEffort) {
+  const effort = String(reasoningEffort || '').toUpperCase().replace('XHIGH', 'EXTRA_HIGH');
+  return String(model || '').toUpperCase().replace(/[.\-]/g, '_') + '_' + effort;
 }
 
 function getAgentModelPolicySnapshot() {

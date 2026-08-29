@@ -25,7 +25,8 @@ function createRdRequest(payload) {
   if (requestKind === 'NEW_PRODUCT') scopeType = 'NEW_PRODUCT';
   assertIn_(scopeType, RD_ENUM.SCOPE_TYPE, 'RD_SCOPE_TYPE');
 
-  const isPriorityFamily = normalize_(targetProduct) === normalize_(RD_CONFIG.PRIORITY_PRODUCT_SCOPE);
+  const familyReference = productFamilyReferenceFor_(targetProduct);
+  const isPriorityFamily = Boolean(familyReference && familyReference.priority);
   const isHai = actor.email === RD_CONFIG.FINAL_APPROVER || Boolean(actor.uatHaiProxy);
   const requestId = nextId_('RDREQ');
   const meta = {
@@ -48,9 +49,9 @@ function createRdRequest(payload) {
     REQUESTER_ROLE: actor.roleCode,
     RD_SCOPE_TYPE: scopeType,
     TARGET_PRODUCT: targetProduct,
-    SOURCE_RECORD_TYPE: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceRecordType : '',
-    SOURCE_FAMILY_CONTAINER_ID: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceFamilyContainerId : '',
-    SOURCE_FAMILY_KEY: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceFamilyKey : '',
+    SOURCE_RECORD_TYPE: familyReference ? 'FAMILY_CONTAINER' : '',
+    SOURCE_FAMILY_CONTAINER_ID: familyReference ? familyReference.sourceFamilyContainerId : '',
+    SOURCE_FAMILY_KEY: familyReference ? familyReference.sourceFamilyKey : '',
     REQUEST_STATUS: 'REQUESTED',
     FAMILY_ASSIGNMENT_STATUS: isHai ? 'CONFIRMED_BY_HAI' : 'PENDING_HAI',
     WORK_PRIORITY: requestedPriority,
@@ -80,7 +81,7 @@ function createRdRequest(payload) {
 
   appendAudit_({ actor, action: 'CREATE_RD_REQUEST', entityType: 'RD_REQUEST', entityId: requestId,
     beforeState: '', afterState: 'REQUESTED', evidenceRef: payload.sourceRef || '', result: 'RECORDED',
-    notes: JSON.stringify({ scopeType, targetProduct, requestKind }) });
+    notes: JSON.stringify({ scopeType, targetProduct, requestKind, sourceFamilyContainerId: familyReference ? familyReference.sourceFamilyContainerId : '' }) });
   SpreadsheetApp.flush();
   return { ok: true, requestId, status: 'REQUESTED' };
 }
@@ -125,19 +126,19 @@ function confirmRequestFamily(requestId, targetProduct, reason) {
   if (!found) throw new Error('Không tìm thấy request: ' + requestId);
   targetProduct = String(targetProduct || found.record.TARGET_PRODUCT || '').trim();
   assertRequired_(targetProduct, 'targetProduct');
-  const isPriorityFamily = normalize_(targetProduct) === normalize_(RD_CONFIG.PRIORITY_PRODUCT_SCOPE);
+  const familyReference = productFamilyReferenceFor_(targetProduct);
   const updated = updateObjectById_(RD_CONFIG.SHEETS.REQUESTS, 'RD_REQUEST_ID', requestId, {
     TARGET_PRODUCT: targetProduct,
     FAMILY_ASSIGNMENT_STATUS: 'CONFIRMED_BY_HAI',
-    SOURCE_RECORD_TYPE: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceRecordType : '',
-    SOURCE_FAMILY_CONTAINER_ID: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceFamilyContainerId : '',
-    SOURCE_FAMILY_KEY: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceFamilyKey : ''
+    SOURCE_RECORD_TYPE: familyReference ? 'FAMILY_CONTAINER' : '',
+    SOURCE_FAMILY_CONTAINER_ID: familyReference ? familyReference.sourceFamilyContainerId : '',
+    SOURCE_FAMILY_KEY: familyReference ? familyReference.sourceFamilyKey : ''
   });
   const caseRecord = getCaseByRequestId_(requestId);
   if (caseRecord) {
     updateObjectById_(RD_CONFIG.SHEETS.PORTFOLIO, 'RD_CASE_ID', caseRecord.RD_CASE_ID, {
       PRODUCT_SCOPE: targetProduct,
-      SOURCE_FAMILY_CONTAINER_ID: isPriorityFamily ? RD_CONFIG.PRODUCT_MASTER_REFERENCE.sourceFamilyContainerId : ''
+      SOURCE_FAMILY_CONTAINER_ID: familyReference ? familyReference.sourceFamilyContainerId : ''
     });
   }
   const decisionId = recordDecisionResult_({
@@ -148,6 +149,14 @@ function confirmRequestFamily(requestId, targetProduct, reason) {
     beforeState: String(found.record.TARGET_PRODUCT || ''), afterState: targetProduct,
     evidenceRef: decisionId, result: 'RECORDED', notes: reason || '' });
   return { ok: true, request: updated, decisionId };
+}
+
+function productFamilyReferenceFor_(targetProduct) {
+  const value = normalize_(targetProduct);
+  return (RD_CONFIG.PRODUCT_FAMILY_REFERENCES || []).find(item =>
+    [item.displayName, item.sourceFamilyName, item.sourceFamilyKey, item.sourceFamilyContainerId]
+      .some(candidate => normalize_(candidate) === value)
+  ) || null;
 }
 
 function approveResearch(requestId, decision, notes) {

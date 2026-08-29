@@ -7,13 +7,20 @@ function getBootstrapData() {
   const openDecisions = listOpenDecisions_();
   const tasks = listMyTasks_(actor.email);
   const evidence = readObjects_(RD_CONFIG.SHEETS.EVIDENCE).slice(-100).reverse();
+  const canOperate = Boolean(actor.permissions && actor.permissions.technicalOperate);
+  const flowSchedule = canOperate ? readFlowSchedule_() : [];
+  const recentRuns = canOperate ? readObjects_(RD_CONFIG.SHEETS.FLOW_RUN_LOG).slice(-12).reverse() : [];
+  const agentAssignments = canOperate
+    ? RD_AGENT_REGISTRY.map(agent => Object.assign({}, agent, resolveAgentModel_(agent)))
+    : [];
 
   return serializeForClient_({
     project: {
       code: RD_CONFIG.PROJECT_CODE,
       version: RD_CONFIG.VERSION,
       environment: RD_CONFIG.ENVIRONMENT,
-      scope: RD_CONFIG.PRIORITY_PRODUCT_SCOPE,
+      scope: 'Toàn hệ sinh thái sản phẩm Hà Tiên',
+      priorityScopes: RD_CONFIG.PRIORITY_PRODUCT_SCOPES,
       productMasterMode: RD_CONFIG.PRODUCT_MASTER_MODE,
       wordpressConnection: RD_CONFIG.WORDPRESS_CONNECTION
     },
@@ -26,6 +33,21 @@ function getBootstrapData() {
     requests,
     cases,
     evidence,
+    productFamilies: (RD_CONFIG.PRODUCT_FAMILY_REFERENCES || []).map(item => Object.assign({}, item, {
+      sourceRecordType: 'FAMILY_CONTAINER',
+      sourceStatus: 'REVIEW_REQUIRED',
+      sourceLabel: 'ID dòng nguồn — không phải mã Product/Model/SKU'
+    })),
+    flowSchedule,
+    recentRuns,
+    agentAssignments,
+    productSource: {
+      authority: 'Kế hoạch HTG - STG - HTC 2026',
+      mode: RD_CONFIG.PRODUCT_MASTER_MODE,
+      sourceRecordType: 'FAMILY_CONTAINER',
+      familyCount: (RD_CONFIG.PRODUCT_FAMILY_REFERENCES || []).length,
+      note: 'ID dòng nguồn chỉ dùng tham chiếu; không tự cấp Product ID, Canonical Model hoặc SKU.'
+    },
     weeklyPack: buildWeeklyPackForUi_(cases, openDecisions, tasks),
     runtime: getRuntimeStatusForUi_()
   });

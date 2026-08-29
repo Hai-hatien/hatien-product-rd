@@ -21,3 +21,12 @@ TRIGGER_CANONICAL_GO_LIVE_DEPLOY=2026-08-29T14:25+07:00
 RETRIGGER_CANONICAL_GO_LIVE_DEPLOY=2026-08-29T14:31+07:00
 
 RETRIGGER_RUNTIME_VERIFIER_DEPLOY=2026-08-29T14:38+07:00
+
+DEPLOY_COMMAND_CENTER_UI_V1_4=2026-08-29T14:56:11+07:00
+
+UI release evidence:
+- Official Hà Tiên logo and approved five-screen Command Center shell.
+- Live Sheet data and existing approval actions retained; no demo/localStorage data shipped.
+- Scope expanded to the full Hà Tiên ecosystem; four priority families pinned.
+- Family container references come from Kế hoạch HTG - STG - HTC 2026 and are not issued Product/Model/SKU codes.
+- Gemini Worker R0-R8 shown separately from externally orchestrated specialist model assignments.

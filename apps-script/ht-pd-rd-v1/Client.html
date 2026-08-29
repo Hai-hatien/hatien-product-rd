@@ -1,6 +1,7 @@
 <script>
 let appData = null;
 let activeLibraryTab = 'ALL';
+let activeCaseTab = 'CASES';
 
 document.addEventListener('DOMContentLoaded', reloadData);
 
@@ -11,10 +12,9 @@ function gas(method, ...args) {
 }
 
 async function reloadData() {
-  setNotice('Đang tải dữ liệu…');
+  setNotice('Đang đọc dữ liệu thật từ R&D Master…');
   try {
-    const data = await gas('getBootstrapData');
-    appData = data;
+    appData = await gas('getBootstrapData');
     renderApp();
     hideNotice();
   } catch (error) {
@@ -30,28 +30,66 @@ function renderApp() {
   }
 
   const actor = data.actor || {};
-  document.getElementById('subtitle').textContent = (actor.displayName || actor.email || 'Người dùng') + ' • ' + (data.project && data.project.environment ? data.project.environment : 'PRODUCTION');
-  document.getElementById('techNav').classList.toggle('hidden', !(actor.permissions && actor.permissions.technicalOperate));
+  const environment = (data.project && data.project.environment) || 'PRODUCTION';
+  const sidebarUser = document.getElementById('sidebarUser');
+  if (sidebarUser) sidebarUser.textContent = actor.displayName || actor.email || 'Người dùng';
+  const envBadge = document.getElementById('environmentBadge');
+  if (envBadge) envBadge.textContent = environment;
+  const techNav = document.getElementById('techNav');
+  if (techNav) techNav.classList.toggle('hidden', !(actor.permissions && actor.permissions.technicalOperate));
+
   renderRuntime(data.runtime || {});
   renderKpis(data.kpis || {});
   renderDecisions(data.decisionCards || []);
   renderCases(data.cases || []);
   renderCandidates(data.candidateLibrary || []);
-  renderWeekly(data.weeklyPack || {});
+  renderPriorityProducts(data.productFamilies || []);
+  renderTodayQueue(data.tasks || [], data.decisionCards || []);
+  renderProductFamilyOptions(data.productFamilies || []);
+  renderAgents(data.flowSchedule || [], data.agentAssignments || [], data.runtime || {});
+  renderSystem(data);
 }
 
 function renderRuntime(runtime) {
   const ready = Boolean(runtime.triggerInstalled && runtime.aiConfigured);
   const badge = document.getElementById('runtimeBadge');
-  badge.className = 'badge ' + (ready ? 'ok' : 'warn');
-  badge.textContent = ready ? 'Hệ thống sẵn sàng' : 'Hệ thống chưa đủ';
-  document.getElementById('runtimeSummary').innerHTML = `
-    <div class="runtime-grid">
-      ${runtimeItem('Lịch', runtime.schedule || '—')}
-      ${runtimeItem('Trigger R0-R8', runtime.triggerInstalled ? 'Đã cài (' + (runtime.triggerCount || 0) + ')' : 'Chưa đủ')}
+  if (badge) {
+    badge.className = 'chip ' + (ready ? 'ok' : 'warn');
+    badge.textContent = ready ? 'Worker đang hoạt động' : 'Cần kiểm tra Worker';
+  }
+  const banner = document.getElementById('runtimeBanner');
+  if (banner) {
+    banner.className = 'runtime-banner ' + (ready ? 'ready' : 'error');
+    banner.innerHTML = `
+      <div class="banner-icon">${ready ? '✓' : '!'}</div>
+      <div><strong>${ready ? 'Worker Gemini và lịch R0–R8 đã kết nối' : 'Worker hoặc lịch R0–R8 chưa sẵn sàng'}</strong>
+      <p>${ready ? esc((runtime.triggerCount || 0) + ' trigger • ' + (runtime.aiModel || 'Gemini') + ' • lần chạy: ' + (runtime.lastDailyRunStatus || 'đã ghi nhận')) : esc((runtime.missingFlows || []).join(', ') || 'Mở Hệ thống để xem chẩn đoán.')}</p></div>
+      <button class="link-button" onclick="showViewByName('technical')">Xem hệ thống →</button>`;
+  }
+  const dot = document.getElementById('healthDot');
+  if (dot) dot.className = 'status-dot ' + (ready ? 'ok' : 'warn');
+  const health = document.getElementById('runtimeHealth');
+  if (health) {
+    health.innerHTML = [
+      healthItem('Lịch R0–R8', runtime.triggerInstalled ? 'Đã cài ' + (runtime.triggerCount || 0) + ' trigger' : 'Thiếu trigger', runtime.triggerInstalled),
+      healthItem('Gemini Worker', runtime.aiConfigured ? 'Đã kết nối • ' + (runtime.aiModel || '') : 'Chưa cấu hình', runtime.aiConfigured),
+      healthItem('Lần chạy gần nhất', runtime.lastDailyRunStatus || 'CHƯA CÓ', Boolean(runtime.lastDailyRunAt)),
+      healthItem('Product Master', 'READ ONLY', true)
+    ].join('');
+  }
+  const summary = document.getElementById('runtimeSummary');
+  if (summary) {
+    summary.innerHTML = `<div class="runtime-grid">
+      ${runtimeItem('Lịch điều phối', runtime.schedule || '—')}
+      ${runtimeItem('Trigger R0–R8', runtime.triggerInstalled ? 'Đã cài (' + (runtime.triggerCount || 0) + ')' : 'Chưa đủ')}
       ${runtimeItem('Gemini', runtime.aiConfigured ? 'Đã cấu hình • ' + (runtime.aiModel || '') : 'Chưa cấu hình')}
       ${runtimeItem('Lần chạy gần nhất', runtime.lastDailyRunAt || 'CHƯA CÓ')}
     </div>`;
+  }
+}
+
+function healthItem(label, value, ok) {
+  return '<div class="health-item"><i class="' + (ok ? 'ok' : 'warn') + '"></i><div><strong>' + esc(label) + '</strong><small>' + esc(value) + '</small></div><b>' + (ok ? 'OK' : 'CHECK') + '</b></div>';
 }
 
 function runtimeItem(label, value) {
@@ -60,26 +98,33 @@ function runtimeItem(label, value) {
 
 function renderKpis(kpis) {
   const cards = [
-    ['Cần duyệt', kpis.openDecisionCount || 0, 'Việc chờ quyết định'],
-    ['Blocker P0/P1', kpis.blockerP0P1Count || 0, 'Phải gỡ trước'],
-    ['Đang R&D', kpis.activeCaseCount || 0, 'Hồ sơ đang chạy'],
-    ['Độ phủ bằng chứng', kpis.evidenceCoverage == null ? '—' : kpis.evidenceCoverage + '%', 'Theo hồ sơ']
+    ['Yêu cầu R&D', kpis.requestCount || 0, 'Tổng yêu cầu đã ghi nhận'],
+    ['Cần Hải xem', kpis.openDecisionCount || 0, 'Quyết định đang mở'],
+    ['Blocker P0/P1', kpis.blockerP0P1Count || 0, 'Việc đang chặn luồng'],
+    ['Nhóm chủ lực', 4, 'Fryer • Tủ cơm • Chảo • Nồi']
   ];
-  document.getElementById('kpiCards').innerHTML = cards.map((c, i) => `
-    <article class="kpi-card ${i === 1 && Number(c[1]) > 0 ? 'alert' : ''}">
-      <span>${esc(c[0])}</span><strong>${esc(String(c[1]))}</strong><small>${esc(c[2])}</small>
+  const el = document.getElementById('kpiCards');
+  if (!el) return;
+  el.innerHTML = cards.map((card, index) => `
+    <article class="kpi-card ${index === 2 && Number(card[1]) > 0 ? 'alert' : ''}">
+      <span>${esc(card[0])}</span><strong>${esc(String(card[1]))}</strong><small>${esc(card[2])}</small>
     </article>`).join('');
 }
 
 function renderDecisions(cards) {
   const top = cards.slice(0, 4);
-  document.getElementById('overviewDecisions').innerHTML = top.length ? top.map(renderDecisionList).join('') : emptyState('Không có việc cần duyệt.');
-  document.getElementById('approvalCards').innerHTML = cards.length ? cards.map(renderDecisionCard).join('') : emptyState('Không có việc cần duyệt.');
+  const overview = document.getElementById('overviewDecisions');
+  const approvals = document.getElementById('approvalCards');
+  const count = document.getElementById('decisionNavCount');
+  if (count) count.textContent = String(cards.length || 0);
+  if (overview) overview.innerHTML = top.length ? top.map(renderDecisionList).join('') : emptyState('Không có việc cần quyết định.');
+  if (approvals) approvals.innerHTML = cards.length ? cards.map(renderDecisionCard).join('') : emptyState('Không có việc cần quyết định.');
 }
 
 function renderDecisionList(card) {
   return `<article class="item-card">
-    <div><span class="eyebrow">${esc(card.gateLabel || 'QUYẾT ĐỊNH')}</span><h4>${esc(card.title || card.id)}</h4><p>${esc(card.subtitle || '')}</p></div>
+    <div><div class="item-meta"><span class="mini-tag warn">${esc(card.gateLabel || 'QUYẾT ĐỊNH')}</span><span class="mini-tag">${esc(statusLabel(card.status))}</span></div>
+    <h4>${esc(card.title || card.id)}</h4><p>${esc(card.problem || card.subtitle || '')}</p></div>
     <button class="button secondary" onclick="showViewByName('approvals')">Xem</button>
   </article>`;
 }
@@ -100,22 +145,22 @@ function renderDecisionCard(card) {
     if (card.canSetPriority) {
       actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
     }
-    actions += "<button class=\"button\" onclick='approveResearchCard(" + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ")'>Duyệt nghiên cứu</button>";
+    actions += "<button class=\"button primary\" onclick='approveResearchCard(" + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ")'>Duyệt nghiên cứu</button>";
   }
 
   if (card.cardType === 'OPEN_DECISION' && card.canApprove) {
     if (card.decisionType === 'RESEARCH_GATE' && card.rdRequestId) {
-      actions += "<button class=\"button\" onclick='approveResearchOpenDecision(" + JSON.stringify(card.rdRequestId) + ")'>Duyệt nghiên cứu</button>";
+      actions += "<button class=\"button primary\" onclick='approveResearchOpenDecision(" + JSON.stringify(card.rdRequestId) + ")'>Duyệt nghiên cứu</button>";
     }
     if (card.decisionType === 'M0_INPUT_CONFIRMATION' && card.decisionId) {
-      actions += "<button class=\"button\" onclick='confirmM0(" + JSON.stringify(card.decisionId) + ")'>Xác nhận M0</button>";
+      actions += "<button class=\"button primary\" onclick='confirmM0(" + JSON.stringify(card.decisionId) + ")'>Xác nhận M0</button>";
     }
     if (card.decisionType === 'WORK_PRIORITY_SELECTION' && permissions.setPriority && card.decisionId) {
       actions += `<select id="open-priority-${attr(card.id)}" class="priority-select"><option value="">Chọn P0-P3</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
-      actions += "<button class=\"button\" onclick='resolvePriorityDecision(" + JSON.stringify(card.decisionId) + ',' + JSON.stringify(card.id) + ")'>Xác nhận ưu tiên</button>";
+      actions += "<button class=\"button primary\" onclick='resolvePriorityDecision(" + JSON.stringify(card.decisionId) + ',' + JSON.stringify(card.id) + ")'>Xác nhận ưu tiên</button>";
     }
     if (card.decisionType === 'FAMILY_SCOPE_CONFIRMATION' && permissions.assignFamily && card.decisionId) {
-      actions += "<button class=\"button\" onclick='resolveFamilyDecision(" + JSON.stringify(card.decisionId) + ")'>Xác nhận dòng sản phẩm</button>";
+      actions += "<button class=\"button primary\" onclick='resolveFamilyDecision(" + JSON.stringify(card.decisionId) + ")'>Xác nhận dòng sản phẩm</button>";
     }
   }
 
@@ -150,6 +195,7 @@ function openRequestDetail(requestId) {
   box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(request.RD_REQUEST_ID)}</span><h3>${esc(request.REQUEST_TITLE || request.RD_REQUEST_ID)}</h3><p>${esc(statusLabel(request.REQUEST_STATUS || ''))}</p></div></div>
     <div class="decision-facts">
       ${fact('Dòng sản phẩm', request.TARGET_PRODUCT || 'CHƯA BIẾT')}
+      ${fact('ID dòng nguồn', request.SOURCE_FAMILY_CONTAINER_ID || 'CHƯA MAP')}
       ${fact('Thị trường', request.TARGET_MARKET || 'CHƯA BIẾT')}
       ${fact('Khách hàng / use case', request.TARGET_CUSTOMER || 'CHƯA BIẾT')}
       ${fact('Pain', request.CUSTOMER_PAIN || 'CHƯA BIẾT')}
@@ -167,7 +213,7 @@ async function approveResearchCard(requestId, cardId) {
   const reason = window.prompt('Ghi chú quyết định (có thể để trống):', '') || '';
   setNotice('Đang ghi quyết định…');
   try {
-    if (priority) await gas('setRequestPriority', requestId, priority, reason || 'Xác nhận ưu tiên từ Dashboard UAT');
+    if (priority) await gas('setRequestPriority', requestId, priority, reason || 'Xác nhận ưu tiên từ Command Center V1');
     await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
     await reloadData();
     showViewByName('cases');
@@ -176,7 +222,7 @@ async function approveResearchCard(requestId, cardId) {
 }
 
 async function approveResearchOpenDecision(requestId) {
-  const reason = window.prompt('Lý do duyệt nghiên cứu:', 'Đủ điều kiện bắt đầu nghiên cứu UAT') || '';
+  const reason = window.prompt('Lý do duyệt nghiên cứu:', 'Đủ điều kiện bắt đầu nghiên cứu') || '';
   setNotice('Đang duyệt nghiên cứu…');
   try {
     await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
@@ -188,15 +234,9 @@ async function approveResearchOpenDecision(requestId) {
 
 async function resolvePriorityDecision(decisionId, cardId) {
   const priority = (document.getElementById('open-priority-' + cardId) || {}).value || '';
-  if (!priority) {
-    showError(new Error('Chọn P0-P3 trước khi xác nhận.'));
-    return;
-  }
-  const reason = window.prompt('Lý do chọn ' + priority + ':', 'Xác nhận ưu tiên từ Dashboard UAT') || '';
-  if (!reason.trim()) {
-    showError(new Error('Cần ghi lý do quyết định ưu tiên.'));
-    return;
-  }
+  if (!priority) return showError(new Error('Chọn P0-P3 trước khi xác nhận.'));
+  const reason = window.prompt('Lý do chọn ' + priority + ':', 'Xác nhận ưu tiên từ Command Center V1') || '';
+  if (!reason.trim()) return showError(new Error('Cần ghi lý do quyết định ưu tiên.'));
   setNotice('Đang xác nhận ưu tiên…');
   try {
     await gas('resolveOpenDecision', { decisionId, priority, reason });
@@ -206,11 +246,8 @@ async function resolvePriorityDecision(decisionId, cardId) {
 }
 
 async function resolveFamilyDecision(decisionId) {
-  const reason = window.prompt('Ghi lý do xác nhận dòng sản phẩm:', 'Xác nhận phạm vi sản phẩm từ Dashboard UAT') || '';
-  if (!reason.trim()) {
-    showError(new Error('Cần ghi lý do xác nhận dòng sản phẩm.'));
-    return;
-  }
+  const reason = window.prompt('Ghi lý do xác nhận dòng sản phẩm:', 'Xác nhận theo nguồn Kế hoạch HTG - STG - HTC 2026') || '';
+  if (!reason.trim()) return showError(new Error('Cần ghi lý do xác nhận dòng sản phẩm.'));
   setNotice('Đang xác nhận dòng sản phẩm…');
   try {
     await gas('resolveOpenDecision', { decisionId, reason });
@@ -223,7 +260,7 @@ async function confirmM0(decisionId) {
   if (!window.confirm('Xác nhận bộ M0 hiện tại và mở R1/R2/R3 song song?')) return;
   setNotice('Đang xác nhận M0…');
   try {
-    await gas('resolveOpenDecision', { decisionId, decision: 'CONFIRMED_M0', reason: 'Xác nhận từ Dashboard R&D UAT' });
+    await gas('resolveOpenDecision', { decisionId, decision: 'CONFIRMED_M0', reason: 'Xác nhận từ Command Center V1' });
     await reloadData();
     setNotice('M0 đã xác nhận. R1/R2/R3 được mở song song.');
   } catch (error) { showError(error); }
@@ -231,8 +268,10 @@ async function confirmM0(decisionId) {
 
 function renderCases(cases) {
   const el = document.getElementById('caseList');
+  if (!el) return;
   el.innerHTML = cases.length ? cases.map(row => `<article class="item-card">
-    <div><span class="eyebrow">${esc(row.RD_CASE_ID || '')}</span><h4>${esc(row.CASE_TITLE || row.RD_CASE_ID)}</h4><p>${esc(statusLabel(row.CURRENT_STAGE))} • ${esc(statusLabel(row.CASE_STATUS))} • ${esc(row.WORK_PRIORITY || 'Chưa có ưu tiên')}</p></div>
+    <div><div class="item-meta"><span class="mini-tag">${esc(row.RD_CASE_ID || '')}</span><span class="mini-tag ${String(row.WORK_PRIORITY || '') === 'P0' ? 'warn' : ''}">${esc(row.WORK_PRIORITY || 'Chưa ưu tiên')}</span></div>
+    <h4>${esc(row.CASE_TITLE || row.RD_CASE_ID)}</h4><p>${esc(statusLabel(row.CURRENT_STAGE))} • ${esc(statusLabel(row.CASE_STATUS))}</p></div>
     <button class="button secondary" onclick='loadCase(${JSON.stringify(row.RD_CASE_ID)})'>Mở</button>
   </article>`).join('') : emptyState('Chưa có hồ sơ R&D.');
 }
@@ -245,41 +284,59 @@ async function loadCase(caseId) {
     box.classList.remove('hidden');
     box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(caseId)}</span><h3>${esc(detail.caseRecord.CASE_TITLE || caseId)}</h3></div></div>
       <div class="case-stats">${fact('Giai đoạn', statusLabel(detail.caseRecord.CURRENT_STAGE))}${fact('Trạng thái', statusLabel(detail.caseRecord.CASE_STATUS))}${fact('Market', detail.market.length + ' mục')}${fact('VOC', detail.voc.length + ' mục')}${fact('Benchmark', detail.benchmark.length + ' mục')}${fact('Bằng chứng', detail.evidence.length + ' mục')}</div>
-      <div class="table-wrap"><table><thead><tr><th>Bước</th><th>Công việc</th><th>Trạng thái</th></tr></thead><tbody>${detail.tasks.map(t => `<tr><td>${esc(t.SUBFLOW_ID)}</td><td>${esc(t.TASK_TITLE)}</td><td>${esc(statusLabel(t.STATUS))}</td></tr>`).join('')}</tbody></table></div>`;
+      <div class="table-wrap"><table><thead><tr><th>Bước</th><th>Công việc</th><th>Trạng thái</th></tr></thead><tbody>${detail.tasks.map(task => `<tr><td>${esc(task.SUBFLOW_ID)}</td><td>${esc(task.TASK_TITLE)}</td><td>${esc(statusLabel(task.STATUS))}</td></tr>`).join('')}</tbody></table></div>`;
     showViewByName('cases');
+    setCaseTab('CASES', null);
     hideNotice();
   } catch (error) { showError(error); }
 }
 
 function openRelatedCase(caseId) {
-  if (caseId) {
-    loadCase(caseId);
-    return;
-  }
-  showError(new Error('Hồ sơ R&D chưa được tạo cho mục này. Hãy mở yêu cầu hoặc thực hiện quyết định tương ứng.'));
+  if (caseId) return loadCase(caseId);
+  showError(new Error('Hồ sơ R&D chưa được tạo cho mục này.'));
 }
 
 function renderCandidates(cards) {
-  const ai = cards.filter(c => c.statusGroup === 'AI_PROPOSAL').slice(0, 3);
-  document.getElementById('overviewCandidates').innerHTML = ai.length ? ai.map(renderCandidate).join('') : emptyState('Chưa có đề xuất AI mới.');
+  const ai = cards.filter(card => card.statusGroup === 'AI_PROPOSAL').slice(0, 3);
+  const overview = document.getElementById('overviewCandidates');
+  if (overview) overview.innerHTML = ai.length ? ai.map(renderCandidate).join('') : emptyState('Chưa có đề xuất AI mới.');
   renderLibrary();
 }
 
 function renderLibrary() {
   const cards = (appData && appData.candidateLibrary) || [];
-  const filtered = activeLibraryTab === 'ALL' ? cards : cards.filter(c => c.statusGroup === activeLibraryTab);
-  document.getElementById('candidateLibrary').innerHTML = filtered.length ? filtered.map(renderCandidate).join('') : emptyState('Chưa có dữ liệu ở nhóm này.');
+  const filtered = activeLibraryTab === 'ALL' ? cards : cards.filter(card => card.statusGroup === activeLibraryTab);
+  const el = document.getElementById('candidateLibrary');
+  if (el) el.innerHTML = filtered.length ? filtered.map(renderCandidate).join('') : emptyState('Chưa có dữ liệu ở nhóm này.');
 }
 
 function renderCandidate(card) {
   return `<article class="candidate-card">
     <div><div class="candidate-meta"><span>${esc(card.origin === 'AI' ? 'AI đề xuất' : 'Yêu cầu nội bộ')}</span><span>${esc(statusLabel(card.stage || card.statusGroup))}</span></div>
-    <h4>${esc(card.title || card.candidateId)}</h4><p>${esc(card.customer || 'CHƯA BIẾT')}</p>
+    <h4>${esc(card.title || card.candidateId)}</h4><p>${esc(card.productScope || '')} • ${esc(card.customer || 'CHƯA BIẾT')}</p>
     <div class="candidate-line"><b>Pain:</b> ${esc(card.pain || 'CHƯA BIẾT')}</div>
-    <div class="candidate-line"><b>Giá trị:</b> ${esc(card.value || 'CHƯA CÓ DỮ LIỆU')}</div>
-    <div class="candidate-line"><b>Bằng chứng:</b> ${esc(String(card.evidenceCount || 0))} nguồn/mục</div></div>
+    <div class="candidate-line"><b>Giá trị:</b> ${esc(card.value || 'CHƯA CÓ DỮ LIỆU')}</div></div>
     ${card.rdCaseId ? "<button class=\"button secondary\" onclick='loadCase(" + JSON.stringify(card.rdCaseId) + ")'>Mở hồ sơ</button>" : ''}
   </article>`;
+}
+
+function setCaseTab(tab, button) {
+  activeCaseTab = tab;
+  document.querySelectorAll('[data-case-tab]').forEach(el => el.classList.toggle('active', el.dataset.caseTab === tab));
+  if (button) button.classList.add('active');
+  const caseList = document.getElementById('caseList');
+  const library = document.getElementById('candidateLibrary');
+  const detail = document.getElementById('caseDetail');
+  if (tab === 'CASES') {
+    if (caseList) caseList.classList.remove('hidden');
+    if (library) library.classList.add('hidden');
+  } else {
+    activeLibraryTab = tab;
+    if (caseList) caseList.classList.add('hidden');
+    if (detail) detail.classList.add('hidden');
+    if (library) library.classList.remove('hidden');
+    renderLibrary();
+  }
 }
 
 function setLibraryTab(tab, button) {
@@ -289,28 +346,142 @@ function setLibraryTab(tab, button) {
   renderLibrary();
 }
 
-function renderWeekly(pack) {
-  const lines = pack.lines || [];
-  document.getElementById('weeklySummary').innerHTML = lines.length ? lines.map(line => '<div>• ' + esc(line) + '</div>').join('') : '<div>Chưa có dữ liệu tuần.</div>';
+function renderPriorityProducts(families) {
+  const priority = families.filter(item => item.priority).slice(0, 4);
+  const el = document.getElementById('priorityProducts');
+  if (!el) return;
+  el.innerHTML = priority.length ? priority.map((item, index) => `
+    <div class="product-row">
+      <div class="product-index">0${index + 1}</div>
+      <div class="product-name"><strong>${esc(item.displayName)}</strong><small>${esc(item.sourceFamilyName)}</small></div>
+      <div class="source-id">ID ${esc(item.sourceFamilyContainerId)}</div>
+      <div class="source-type">FAMILY CONTAINER</div>
+    </div>`).join('') : emptyState('Chưa tải được danh mục nguồn.');
+}
+
+function renderTodayQueue(tasks, decisions) {
+  const ready = tasks.filter(task => ['READY', 'READY_MONITORING'].includes(String(task.STATUS || ''))).length;
+  const blocked = tasks.filter(task => ['BLOCKED', 'WAITING_INPUT', 'WAITING_DEPENDENCY'].includes(String(task.STATUS || ''))).length;
+  const rows = [
+    ['Quyết định đang mở', decisions.length, decisions.length === 0],
+    ['Task sẵn sàng', ready, true],
+    ['Blocker / chờ input', blocked, blocked === 0],
+    ['Hồ sơ đang theo dõi', ((appData && appData.cases) || []).length, true]
+  ];
+  const el = document.getElementById('todayQueue');
+  if (!el) return;
+  el.innerHTML = rows.map(row => '<div class="queue-item"><i></i><div><strong>' + esc(row[0]) + '</strong><small>Cập nhật từ R&D Master</small></div><b>' + esc(row[1]) + '</b></div>').join('');
+}
+
+function renderProductFamilyOptions(families) {
+  const select = document.getElementById('targetProductSelect');
+  if (!select || !families.length) return;
+  const priority = families.filter(item => item.priority);
+  const rest = families.filter(item => !item.priority);
+  select.innerHTML = '<optgroup label="4 nhóm chủ lực">' + priority.map(optionForFamily).join('') + '</optgroup>' +
+    '<optgroup label="Toàn hệ sinh thái">' + rest.map(optionForFamily).join('') + '</optgroup>' +
+    '<optgroup label="Ngoài danh mục"><option value="SẢN PHẨM MỚI - CHƯA CÓ DÒNG">Sản phẩm mới — chưa có dòng</option><option value="KHÁC / TÙY CHỈNH">Khác / tùy chỉnh</option></optgroup>';
+}
+
+function optionForFamily(item) {
+  return '<option value="' + esc(item.displayName) + '">' + esc(item.displayName) + ' — ID dòng nguồn ' + esc(item.sourceFamilyContainerId) + '</option>';
+}
+
+function renderAgents(flows, assignments, runtime) {
+  const ready = Boolean(runtime.triggerInstalled && runtime.aiConfigured);
+  const summary = document.getElementById('agentWorkerSummary');
+  if (summary) summary.innerHTML = `<div class="worker-mark">⌘</div><div class="worker-copy"><strong>Gemini Worker R0–R8 ${ready ? 'đã kết nối' : 'cần kiểm tra'}</strong><small>${esc(runtime.aiModel || 'Gemini')} • ${esc(runtime.schedule || 'Lịch từ 95_Flow_Schedule')}</small></div><span class="badge ${ready ? 'ok' : 'warn'}">${ready ? 'ĐANG HOẠT ĐỘNG' : 'CHECK RUNTIME'}</span>`;
+
+  const flowGrid = document.getElementById('flowAgentGrid');
+  if (flowGrid) {
+    const fallback = Array.from({length: 9}, (_, index) => ({ FLOW_ID: 'R' + index, HANDLER: 'Theo 95_Flow_Schedule', TRIGGER_STATUS: runtime.triggerInstalled ? 'INSTALLED' : 'CHECK' }));
+    const rows = flows.length ? flows : fallback;
+    flowGrid.innerHTML = rows.map(row => `<article class="flow-card"><div class="flow-card-head"><span class="flow-id">${esc(row.FLOW_ID || '')}</span><span class="flow-state">${ready ? 'ĐÃ NỐI' : 'CHECK'}</span></div><strong>${esc(flowTitle(row.FLOW_ID))}</strong><small>${esc(row.HANDLER || 'Gemini Worker')} • ${esc(normalizeTime(row.START_TIME) || '')}</small></article>`).join('');
+  }
+
+  const table = document.getElementById('agentAssignments');
+  if (table) {
+    if (!assignments.length) {
+      table.innerHTML = emptyState('Tài khoản hiện tại không có quyền xem model assignment.');
+    } else {
+      table.innerHTML = '<div class="agent-row header"><span>NHÓM</span><span>AGENT</span><span>MODEL PROFILE</span><span>TRẠNG THÁI</span></div>' +
+        assignments.map(agent => `<div class="agent-row"><div><strong>${esc(agent.team || '')}</strong><small>${esc(agent.role || '')}</small></div><div><strong>${esc(agent.name || agent.agentId)}</strong><small>${esc(agent.agentId)}</small></div><div class="model-code">${esc(agent.profileCode || agent.model)}</div><span class="badge ok">ĐÃ MAP</span></div>`).join('');
+    }
+  }
+}
+
+function flowTitle(flowId) {
+  const titles = {
+    R0: 'Case Controller', R1: 'Market & Signal', R2: 'Customer / JTBD', R3: 'Benchmark',
+    R4: 'Product Synthesis', R5: 'Concept & Requirement', R6: 'Prototype / DFM', R7: 'Proof & QA', R8: 'Handover'
+  };
+  return titles[String(flowId || '').toUpperCase()] || 'Luồng sản phẩm';
+}
+
+function normalizeTime(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  try { return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); }
+  catch (error) { return String(value); }
+}
+
+function renderSystem(data) {
+  const source = data.productSource || {};
+  const governance = document.getElementById('sourceGovernance');
+  if (governance) governance.innerHTML = '<div class="governance-list">' + [
+    ['Nguồn authority', source.authority || '—'],
+    ['Chế độ Product Master', source.mode || 'READ_ONLY'],
+    ['Số dòng Family nguồn', source.familyCount || 0],
+    ['Loại bản ghi', source.sourceRecordType || 'FAMILY_CONTAINER'],
+    ['Quyền phát hành mã', 'KHÔNG TỰ ĐỘNG']
+  ].map(row => '<div class="governance-row"><span>' + esc(row[0]) + '</span><strong>' + esc(row[1]) + '</strong></div>').join('') + '</div>';
+
+  const recent = document.getElementById('recentRuns');
+  const runs = data.recentRuns || [];
+  if (recent) recent.innerHTML = runs.length ? '<div class="run-list">' + runs.slice(0, 6).map(run => {
+    const id = run.RUN_ID || run.FLOW_RUN_ID || run.FLOW_ID || 'RUN';
+    const status = run.RUN_STATUS || run.STATUS || 'RECORDED';
+    const time = run.FINISHED_AT || run.STARTED_AT || '';
+    return '<div class="run-row"><div><strong>' + esc(id) + '</strong><span>' + esc(normalizeTime(time)) + '</span></div><span class="badge ' + (/READY|PASS|COMPLETE|VERIFIED/.test(String(status)) ? 'ok' : '') + '">' + esc(statusLabel(status)) + '</span></div>';
+  }).join('') + '</div>' : emptyState('Chưa có log chạy.');
+}
+
+function openCreateRequest() {
+  const modal = document.getElementById('createModal');
+  if (modal) modal.classList.remove('hidden');
+  setRequestStep(1);
+  if (document.body) document.body.style.overflow = 'hidden';
+}
+
+function closeCreateRequest() {
+  const modal = document.getElementById('createModal');
+  if (modal) modal.classList.add('hidden');
+  if (document.body) document.body.style.overflow = '';
 }
 
 function setRequestStep(step) {
   document.querySelectorAll('.request-step').forEach(el => el.classList.toggle('hidden', Number(el.dataset.step) !== Number(step)));
-  document.getElementById('requestStepBadge').textContent = 'BƯỚC ' + step + '/2';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const badge = document.getElementById('requestStepBadge');
+  const progress = document.getElementById('stepProgress');
+  if (badge) badge.textContent = 'BƯỚC ' + step + '/2';
+  if (progress) progress.style.width = (step * 50) + '%';
 }
 
 async function submitRequest(event) {
   event.preventDefault();
   const form = event.target;
   const payload = Object.fromEntries(new FormData(form).entries());
-  const extra = [payload.sizeLimit && 'Kích thước: ' + payload.sizeLimit, payload.energySource && 'Năng lượng: ' + payload.energySource, payload.targetBudget && 'Ngân sách: ' + payload.targetBudget].filter(Boolean).join(' | ');
+  const extra = [
+    payload.sizeLimit && 'Kích thước: ' + payload.sizeLimit,
+    payload.energySource && 'Năng lượng: ' + payload.energySource,
+    payload.targetBudget && 'Ngân sách: ' + payload.targetBudget
+  ].filter(Boolean).join(' | ');
   payload.constraints = [payload.constraints, extra].filter(Boolean).join(' | ') || 'CHƯA BIẾT';
-  setNotice('Đang tạo yêu cầu…');
+  setNotice('Đang tạo yêu cầu R&D…');
   try {
     const result = await gas('createRdRequest', payload);
     form.reset();
-    setRequestStep(1);
+    closeCreateRequest();
     await reloadData();
     showViewByName('approvals');
     setNotice('Đã tạo ' + result.requestId + '.');
@@ -318,30 +489,54 @@ async function submitRequest(event) {
 }
 
 async function verifyRuntime() {
-  document.getElementById('technicalOutput').textContent = 'Đang kiểm tra…';
-  try { document.getElementById('technicalOutput').textContent = JSON.stringify(await gas('verifyRuntimePrerequisites'), null, 2); }
-  catch (error) { document.getElementById('technicalOutput').textContent = error.message || String(error); }
+  const output = document.getElementById('technicalOutput');
+  if (output) output.textContent = 'Đang kiểm tra…';
+  try {
+    const result = await gas('verifyRuntimePrerequisites');
+    if (output) output.textContent = JSON.stringify(result, null, 2);
+    await reloadData();
+    showViewByName('technical');
+  } catch (error) {
+    if (output) output.textContent = error.message || String(error);
+  }
 }
 
 async function runBehavioralUat() {
-  document.getElementById('technicalOutput').textContent = 'Đang chạy backend UAT…';
-  try { document.getElementById('technicalOutput').textContent = JSON.stringify(await gas('runBackendUatGateTests'), null, 2); await reloadData(); }
-  catch (error) { document.getElementById('technicalOutput').textContent = error.message || String(error); }
+  const output = document.getElementById('technicalOutput');
+  if (output) output.textContent = 'Đang chạy backend UAT…';
+  try {
+    if (output) output.textContent = JSON.stringify(await gas('runBackendUatGateTests'), null, 2);
+    await reloadData();
+  } catch (error) {
+    if (output) output.textContent = error.message || String(error);
+  }
 }
 
 function showView(name, button) {
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === 'view-' + name));
+  document.querySelectorAll('[data-view]').forEach(nav => nav.classList.toggle('active', nav.dataset.view === name));
   if (button) button.classList.add('active');
+  const title = document.getElementById('screenTitle');
+  const titles = { overview: 'Tổng quan', approvals: 'Cần quyết định', cases: 'Hồ sơ R&D', agents: 'Điều phối agent', technical: 'Hệ thống' };
+  if (title) title.textContent = titles[name] || 'Command Center';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-function showViewByName(name) { showView(name, null); }
 
-function setNotice(message) { const el = document.getElementById('notice'); el.textContent = message; el.className = 'notice'; }
-function hideNotice() { const el = document.getElementById('notice'); el.className = 'notice hidden'; }
-function showError(error) { const el = document.getElementById('notice'); el.textContent = (error && error.message) || String(error); el.className = 'notice error'; }
+function showViewByName(name) { showView(name, null); }
+function setNotice(message) { const el = document.getElementById('notice'); if (el) { el.textContent = message; el.className = 'notice'; } }
+function hideNotice() { const el = document.getElementById('notice'); if (el) el.className = 'notice hidden'; }
+function showError(error) { const el = document.getElementById('notice'); if (el) { el.textContent = (error && error.message) || String(error); el.className = 'notice error'; } }
 function emptyState(text) { return '<div class="empty-state">' + esc(text) + '</div>'; }
-function statusLabel(value) { return String(value || '—').replace(/_/g, ' '); }
-function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function statusLabel(value) {
+  const raw = String(value || '—');
+  const labels = {
+    REQUESTED: 'Chờ duyệt', READY: 'Sẵn sàng', READY_MONITORING: 'Đang theo dõi',
+    WAITING_AUTHORIZED_APPROVAL: 'Chờ người có quyền duyệt', WAITING_INPUT: 'Chờ đầu vào',
+    WAITING_DEPENDENCY: 'Chờ phụ thuộc', BLOCKED: 'Bị chặn', HANDOFF_READY: 'Sẵn sàng bàn giao',
+    PREREQUISITES_VERIFIED: 'Điều kiện đã xác minh', INSTALLED: 'Đã cài'
+  };
+  return labels[raw] || raw.replace(/_/g, ' ');
+}
+function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 function attr(value) { return String(value == null ? '' : value).replace(/[^a-zA-Z0-9_-]/g, '-'); }
 </script>
