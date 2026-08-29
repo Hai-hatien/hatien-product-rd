@@ -42,3 +42,13 @@ CTA/UI release evidence:
 - Case detail is top-level inside Hồ sơ R&D; list/tabs are hidden while detail is open, and Back restores prior context.
 - Hồ sơ R&D no longer duplicates approval queue as a "Chờ duyệt" tab.
 - Priority selection is separated from research approval.
+
+DEPLOY_BILINGUAL_BE_VIETNAM_PRO_UI=2026-08-29T17:11+07:00
+
+Bilingual UI release evidence:
+- Source commit: 1a04a636e73c0c62bfb7604e86a6fca49fafdb22.
+- Vietnamese display must use Vietnamese wording only for user-facing labels.
+- English mode remains secondary for technical/partner use.
+- User-facing font standard: Be Vietnam Pro.
+- Minimum user-facing font size: 16px.
+- No Product ID, Product Family Code, Product Type Code, Canonical Model, Market Variant, Sellable SKU, Serial, Asset, CRM write, or WordPress write may be issued by this UI deploy.
