@@ -9,6 +9,8 @@ const indexHtml = fs.readFileSync(path.join(ROOT, 'Index.html'), 'utf8');
 const match = html.match(/^\s*<script>([\s\S]*)<\/script>\s*$/);
 assert(match, 'Client.html must contain one script wrapper');
 assert(indexHtml.includes('id="requestDetail"'), 'Index must expose requestDetail target');
+assert(indexHtml.includes('id="decisionDetail"'), 'Index must expose decisionDetail target');
+assert(!indexHtml.includes('WAITING_APPROVAL'), 'Cases view must not duplicate approvals as Chờ duyệt tab');
 const js = match[1];
 
 // Parse exactly the browser-side JavaScript before deployment.
@@ -17,15 +19,34 @@ new vm.Script(js, { filename: 'Client.html' });
 const elements = new Map();
 function el(id) {
   if (!elements.has(id)) {
-    elements.set(id, {
+    const element = {
       id,
       innerHTML: '',
       textContent: '',
-      className: '',
+      className: 'hidden',
       value: '',
-      classList: { add() {}, remove() {}, toggle() {} },
       scrollIntoView() {}
-    });
+    };
+    element.classList = {
+      add(name) {
+        const names = new Set(element.className.split(/\s+/).filter(Boolean));
+        names.add(name);
+        element.className = Array.from(names).join(' ');
+      },
+      remove(name) {
+        element.className = element.className.split(/\s+/).filter(item => item && item !== name).join(' ');
+      },
+      toggle(name, force) {
+        const has = this.contains(name);
+        const next = force === undefined ? !has : Boolean(force);
+        if (next) this.add(name); else this.remove(name);
+        return next;
+      },
+      contains(name) {
+        return element.className.split(/\s+/).includes(name);
+      }
+    };
+    elements.set(id, element);
   }
   return elements.get(id);
 }
@@ -98,6 +119,15 @@ const requestDecisionHtml = context.renderDecisionCard({
 });
 assert(requestDecisionHtml.includes("openRequestDetail(\"RDREQ-20260828-0001\")"), 'request decision must open request detail instead of dead case action');
 assert(requestDecisionHtml.includes('Duyệt nghiên cứu'), 'research request must expose approve action');
+assert(!requestDecisionHtml.includes('priority-RDREQ-20260828-0001'), 'research approval must not bundle priority selection');
+
+const overviewDecisionHtml = context.renderDecisionList({
+  id: 'DEC-20260828-0100',
+  gateLabel: 'Quyết định mở',
+  title: 'UAT Decision',
+  status: 'WAITING_AUTHORIZED_APPROVAL'
+});
+assert(overviewDecisionHtml.includes("openDecisionFromOverview(\"DEC-20260828-0100\")"), 'overview CTA must target the exact decision id');
 
 const openResearchGateHtml = context.renderDecisionCard({
   cardType: 'OPEN_DECISION',
@@ -157,6 +187,27 @@ const detailHtml = el('requestDetail').innerHTML;
 assert(detailHtml.includes('UAT Request'), 'request detail must render title');
 assert(detailHtml.includes('Hồi nhiệt chậm'), 'request detail must render pain');
 assert(detailHtml.includes('Fryer công nghiệp'), 'request detail must render product scope');
+assert(el('decisionDetail').className.includes('hidden') || el('decisionDetail').innerHTML === '', 'request detail must be a separate substate from decision detail');
+
+context.renderDecisionDetail({
+  id: 'DEC-20260828-0100',
+  decisionId: 'DEC-20260828-0100',
+  rdRequestId: 'RDREQ-20260828-0001',
+  cardType: 'OPEN_DECISION',
+  decisionType: 'RESEARCH_GATE',
+  canApprove: true,
+  title: 'UAT Decision',
+  status: 'WAITING_AUTHORIZED_APPROVAL'
+});
+assert(el('requestDetail').className.includes('hidden'), 'opening decision detail must hide request detail');
+assert(el('decisionDetail').innerHTML.includes('approveResearchOpenDecision'), 'exact decision detail must keep its business action');
+
+assert(js.includes('showResearchReceipt(result)'), 'approving research must render an explicit receipt');
+assert(!/approveResearch(?:Card|OpenDecision)[\s\S]*?showViewByName\('cases'\)/.test(js), 'approve research must not auto-jump to cases');
+assert(js.includes('openRequestDetail(result.requestId)'), 'creating request must open the newly created request detail');
+assert(js.includes('preserveScroll'), 'view changes must support no-scroll CTA transitions');
+assert(js.includes("view: currentView && currentView.id"), 'case back navigation must remember the originating screen');
+assert(js.includes("showViewByName(state.view || 'cases'"), 'case back navigation must restore the originating screen');
 
 const candidateHtml = context.renderCandidate({
   rdCaseId: 'RDCASE-20260828-0001',

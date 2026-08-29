@@ -2,6 +2,7 @@
 let appData = null;
 let activeLibraryTab = 'ALL';
 let activeCaseTab = 'CASES';
+let caseReturnState = null;
 
 document.addEventListener('DOMContentLoaded', reloadData);
 
@@ -125,11 +126,26 @@ function renderDecisionList(card) {
   return `<article class="item-card">
     <div><div class="item-meta"><span class="mini-tag warn">${esc(card.gateLabel || 'QUYẾT ĐỊNH')}</span><span class="mini-tag">${esc(statusLabel(card.status))}</span></div>
     <h4>${esc(card.title || card.id)}</h4><p>${esc(card.problem || card.subtitle || '')}</p></div>
-    <button class="button secondary" onclick="showViewByName('approvals')">Xem</button>
+    <button class="button secondary" onclick='openDecisionFromOverview(${JSON.stringify(card.id || card.decisionId || card.rdRequestId)})'>Xem</button>
   </article>`;
 }
 
 function renderDecisionCard(card) {
+  const actions = renderDecisionActions(card);
+
+  return `<article class="decision-card">
+    <div class="decision-head"><div><span class="eyebrow">${esc(card.gateLabel || '')}</span><h3>${esc(card.title || card.id)}</h3><p>${esc(card.subtitle || '')}</p></div><span class="badge warn">${esc(statusLabel(card.status))}</span></div>
+    <div class="decision-facts">
+      ${fact('Khách hàng', card.customer || 'CHƯA BIẾT')}
+      ${fact('Pain / phạm vi', card.problem || 'CHƯA CÓ DỮ LIỆU')}
+      ${fact('Bằng chứng', card.evidence || 'CHƯA CÓ')}
+      ${fact('Khuyến nghị', card.recommendation || 'MỞ HỒ SƠ')}
+    </div>
+    <div class="form-actions">${actions}</div>
+  </article>`;
+}
+
+function renderDecisionActions(card) {
   const permissions = (appData && appData.actor && appData.actor.permissions) || {};
   let actions = '';
 
@@ -142,9 +158,6 @@ function renderDecisionCard(card) {
   }
 
   if (card.cardType === 'RESEARCH_REQUEST' && card.canApprove) {
-    if (card.canSetPriority) {
-      actions += `<select id="priority-${attr(card.id)}" class="priority-select"><option value="">Ưu tiên</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>`;
-    }
     actions += "<button class=\"button primary\" onclick='approveResearchCard(" + JSON.stringify(card.rdRequestId) + ',' + JSON.stringify(card.id) + ")'>Duyệt nghiên cứu</button>";
   }
 
@@ -164,20 +177,44 @@ function renderDecisionCard(card) {
     }
   }
 
-  return `<article class="decision-card">
-    <div class="decision-head"><div><span class="eyebrow">${esc(card.gateLabel || '')}</span><h3>${esc(card.title || card.id)}</h3><p>${esc(card.subtitle || '')}</p></div><span class="badge warn">${esc(statusLabel(card.status))}</span></div>
-    <div class="decision-facts">
-      ${fact('Khách hàng', card.customer || 'CHƯA BIẾT')}
-      ${fact('Pain / phạm vi', card.problem || 'CHƯA CÓ DỮ LIỆU')}
-      ${fact('Bằng chứng', card.evidence || 'CHƯA CÓ')}
-      ${fact('Khuyến nghị', card.recommendation || 'MỞ HỒ SƠ')}
-    </div>
-    <div class="form-actions">${actions}</div>
-  </article>`;
+  return actions;
 }
 
 function fact(label, value) {
   return '<div class="fact"><span>' + esc(label) + '</span><strong>' + esc(String(value || '—')) + '</strong></div>';
+}
+
+function openDecisionFromOverview(decisionId) {
+  const card = ((appData && appData.decisionCards) || []).find(row => String(row.id || row.decisionId || row.rdRequestId || '') === String(decisionId));
+  if (!card) {
+    showError(new Error('Không tìm thấy quyết định ' + decisionId + ' trong dữ liệu hiện tại.'));
+    return;
+  }
+  showViewByName('approvals', { preserveScroll: true });
+  renderDecisionDetail(card);
+  scrollToDetailTop();
+}
+
+function renderDecisionDetail(card) {
+  const box = document.getElementById('decisionDetail');
+  if (!box) return;
+  hideApprovalDetails('decisionDetail');
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">CHI TIẾT QUYẾT ĐỊNH • ${esc(card.decisionId || card.id || '')}</span><h3>${esc(card.title || card.id)}</h3><p>${esc(card.subtitle || card.gateLabel || '')}</p></div><button class="button secondary" onclick="closeDecisionDetail()">Đóng</button></div>
+    <div class="decision-facts">
+      ${fact('Trạng thái', statusLabel(card.status))}
+      ${fact('Khách hàng', card.customer || 'CHƯA BIẾT')}
+      ${fact('Pain / phạm vi', card.problem || 'CHƯA CÓ DỮ LIỆU')}
+      ${fact('Bằng chứng', card.evidence || 'CHƯA CÓ')}
+      ${fact('Khuyến nghị', card.recommendation || 'MỞ HỒ SƠ')}
+      ${fact('Liên kết', card.rdCaseId || card.rdRequestId || 'CHƯA CÓ')}
+    </div>
+    <div class="form-actions">${renderDecisionActions(card)}</div>`;
+}
+
+function closeDecisionDetail() {
+  const box = document.getElementById('decisionDetail');
+  if (box) box.classList.add('hidden');
 }
 
 function openRequestDetail(requestId) {
@@ -191,8 +228,10 @@ function openRequestDetail(requestId) {
     showError(new Error('Thiếu vùng hiển thị chi tiết yêu cầu.'));
     return;
   }
+  showViewByName('approvals', { preserveScroll: true });
+  hideApprovalDetails('requestDetail');
   box.classList.remove('hidden');
-  box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(request.RD_REQUEST_ID)}</span><h3>${esc(request.REQUEST_TITLE || request.RD_REQUEST_ID)}</h3><p>${esc(statusLabel(request.REQUEST_STATUS || ''))}</p></div></div>
+  box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">CHI TIẾT YÊU CẦU • ${esc(request.RD_REQUEST_ID)}</span><h3>${esc(request.REQUEST_TITLE || request.RD_REQUEST_ID)}</h3><p>${esc(statusLabel(request.REQUEST_STATUS || ''))}</p></div><button class="button secondary" onclick="closeRequestDetail()">Đóng</button></div>
     <div class="decision-facts">
       ${fact('Dòng sản phẩm', request.TARGET_PRODUCT || 'CHƯA BIẾT')}
       ${fact('ID dòng nguồn', request.SOURCE_FAMILY_CONTAINER_ID || 'CHƯA MAP')}
@@ -204,20 +243,33 @@ function openRequestDetail(requestId) {
       ${fact('Ưu tiên', request.WORK_PRIORITY || 'CHƯA CHỌN')}
       ${fact('Nguồn bằng chứng', request.SOURCE_URL_OR_FILE || 'CHƯA CÓ')}
     </div>`;
-  showViewByName('approvals');
-  if (box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToDetailTop();
+}
+
+function closeRequestDetail() {
+  const box = document.getElementById('requestDetail');
+  if (box) box.classList.add('hidden');
+}
+
+function hideApprovalDetails(exceptId) {
+  ['decisionDetail', 'requestDetail'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element && id !== exceptId) element.classList.add('hidden');
+  });
+}
+
+function scrollToDetailTop() {
+  if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 async function approveResearchCard(requestId, cardId) {
-  const priority = (document.getElementById('priority-' + cardId) || {}).value || '';
   const reason = window.prompt('Ghi chú quyết định (có thể để trống):', '') || '';
   setNotice('Đang ghi quyết định…');
   try {
-    if (priority) await gas('setRequestPriority', requestId, priority, reason || 'Xác nhận ưu tiên từ Command Center V1');
-    await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
+    const result = await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
     await reloadData();
-    showViewByName('cases');
-    setNotice('Đã duyệt nghiên cứu.');
+    showResearchReceipt(result);
+    setNotice('Đã duyệt nghiên cứu. Hồ sơ đã tạo, bấm “Mở hồ sơ” khi cần chuyển sang case.');
   } catch (error) { showError(error); }
 }
 
@@ -225,11 +277,29 @@ async function approveResearchOpenDecision(requestId) {
   const reason = window.prompt('Lý do duyệt nghiên cứu:', 'Đủ điều kiện bắt đầu nghiên cứu') || '';
   setNotice('Đang duyệt nghiên cứu…');
   try {
-    await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
+    const result = await gas('approveResearch', requestId, 'RESEARCH_APPROVED', reason);
     await reloadData();
-    showViewByName('cases');
-    setNotice('Đã duyệt nghiên cứu.');
+    showResearchReceipt(result);
+    setNotice('Đã duyệt nghiên cứu. Hồ sơ đã tạo, bấm “Mở hồ sơ” khi cần chuyển sang case.');
   } catch (error) { showError(error); }
+}
+
+function showResearchReceipt(result) {
+  showViewByName('approvals', { preserveScroll: true });
+  hideApprovalDetails('decisionDetail');
+  const box = document.getElementById('decisionDetail');
+  if (!box) return;
+  const caseId = result && result.caseId;
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">BIÊN NHẬN • ${esc((result && result.decisionId) || '')}</span><h3>Đã duyệt nghiên cứu</h3><p>Hệ thống giữ nguyên ngữ cảnh. Chỉ mở hồ sơ khi người dùng chọn bước tiếp theo.</p></div><button class="button secondary" onclick="closeDecisionDetail()">Đóng</button></div>
+    <div class="decision-facts">
+      ${fact('Yêu cầu', (result && result.requestId) || '—')}
+      ${fact('Hồ sơ', caseId || 'CHƯA TẠO')}
+      ${fact('Quyết định', statusLabel((result && result.decision) || 'RESEARCH_APPROVED'))}
+      ${fact('Bước tiếp theo', 'Mở hồ sơ để xem M0/R1/R2/R3')}
+    </div>
+    <div class="form-actions">${caseId ? "<button class=\"button primary\" onclick='openRelatedCase(" + JSON.stringify(caseId) + ")'>Mở hồ sơ</button>" : ''}</div>`;
+  scrollToDetailTop();
 }
 
 async function resolvePriorityDecision(decisionId, cardId) {
@@ -279,16 +349,36 @@ function renderCases(cases) {
 async function loadCase(caseId) {
   setNotice('Đang tải hồ sơ…');
   try {
+    if (!caseReturnState) {
+      const currentView = document.querySelector('.view.active');
+      caseReturnState = {
+        view: currentView && currentView.id ? currentView.id.replace(/^view-/, '') : 'cases',
+        tab: activeCaseTab,
+        scrollY: window.scrollY || 0
+      };
+    }
     const detail = await gas('getCaseDetail', caseId);
     const box = document.getElementById('caseDetail');
+    showViewByName('cases', { preserveScroll: true });
     box.classList.remove('hidden');
-    box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">${esc(caseId)}</span><h3>${esc(detail.caseRecord.CASE_TITLE || caseId)}</h3></div></div>
+    box.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">CHI TIẾT HỒ SƠ • ${esc(caseId)}</span><h3>${esc(detail.caseRecord.CASE_TITLE || caseId)}</h3></div><button class="button secondary" onclick="closeCaseDetail()">Quay lại</button></div>
       <div class="case-stats">${fact('Giai đoạn', statusLabel(detail.caseRecord.CURRENT_STAGE))}${fact('Trạng thái', statusLabel(detail.caseRecord.CASE_STATUS))}${fact('Market', detail.market.length + ' mục')}${fact('VOC', detail.voc.length + ' mục')}${fact('Benchmark', detail.benchmark.length + ' mục')}${fact('Bằng chứng', detail.evidence.length + ' mục')}</div>
       <div class="table-wrap"><table><thead><tr><th>Bước</th><th>Công việc</th><th>Trạng thái</th></tr></thead><tbody>${detail.tasks.map(task => `<tr><td>${esc(task.SUBFLOW_ID)}</td><td>${esc(task.TASK_TITLE)}</td><td>${esc(statusLabel(task.STATUS))}</td></tr>`).join('')}</tbody></table></div>`;
-    showViewByName('cases');
-    setCaseTab('CASES', null);
+    setCaseDetailMode(true);
+    scrollToDetailTop();
     hideNotice();
   } catch (error) { showError(error); }
+}
+
+function closeCaseDetail() {
+  const box = document.getElementById('caseDetail');
+  if (box) box.classList.add('hidden');
+  setCaseDetailMode(false);
+  const state = caseReturnState || { view: 'cases', tab: 'CASES', scrollY: 0 };
+  caseReturnState = null;
+  setCaseTab(state.tab || 'CASES', null);
+  showViewByName(state.view || 'cases', { preserveScroll: true });
+  if (window.scrollTo) window.scrollTo({ top: state.scrollY || 0, behavior: 'auto' });
 }
 
 function openRelatedCase(caseId) {
@@ -327,6 +417,7 @@ function setCaseTab(tab, button) {
   const caseList = document.getElementById('caseList');
   const library = document.getElementById('candidateLibrary');
   const detail = document.getElementById('caseDetail');
+  if (detail && !detail.classList.contains('hidden')) return setCaseDetailMode(true);
   if (tab === 'CASES') {
     if (caseList) caseList.classList.remove('hidden');
     if (library) library.classList.add('hidden');
@@ -337,6 +428,15 @@ function setCaseTab(tab, button) {
     if (library) library.classList.remove('hidden');
     renderLibrary();
   }
+}
+
+function setCaseDetailMode(isDetail) {
+  const caseList = document.getElementById('caseList');
+  const library = document.getElementById('candidateLibrary');
+  const tabs = document.querySelector('#view-cases .tabs');
+  if (caseList) caseList.classList.toggle('hidden', Boolean(isDetail));
+  if (library) library.classList.toggle('hidden', Boolean(isDetail) || activeCaseTab === 'CASES');
+  if (tabs) tabs.classList.toggle('hidden', Boolean(isDetail));
 }
 
 function setLibraryTab(tab, button) {
@@ -483,7 +583,7 @@ async function submitRequest(event) {
     form.reset();
     closeCreateRequest();
     await reloadData();
-    showViewByName('approvals');
+    openRequestDetail(result.requestId);
     setNotice('Đã tạo ' + result.requestId + '.');
   } catch (error) { showError(error); }
 }
@@ -513,16 +613,19 @@ async function runBehavioralUat() {
 }
 
 function showView(name, button) {
+  const current = document.querySelector('.view.active');
+  const alreadyActive = current && current.id === 'view-' + name;
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === 'view-' + name));
   document.querySelectorAll('[data-view]').forEach(nav => nav.classList.toggle('active', nav.dataset.view === name));
   if (button) button.classList.add('active');
   const title = document.getElementById('screenTitle');
   const titles = { overview: 'Tổng quan', approvals: 'Cần quyết định', cases: 'Hồ sơ R&D', agents: 'Điều phối agent', technical: 'Hệ thống' };
   if (title) title.textContent = titles[name] || 'Command Center';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const opts = arguments[2] || {};
+  if (!opts.preserveScroll && !alreadyActive) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showViewByName(name) { showView(name, null); }
+function showViewByName(name, opts) { showView(name, null, opts || {}); }
 function setNotice(message) { const el = document.getElementById('notice'); if (el) { el.textContent = message; el.className = 'notice'; } }
 function hideNotice() { const el = document.getElementById('notice'); if (el) el.className = 'notice hidden'; }
 function showError(error) { const el = document.getElementById('notice'); if (el) { el.textContent = (error && error.message) || String(error); el.className = 'notice error'; } }

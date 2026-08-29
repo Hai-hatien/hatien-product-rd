@@ -111,6 +111,7 @@
 
         <section id="view-approvals" class="view">
           <div class="page-heading"><div><span class="eyebrow">DECISION DESK</span><h2>Cần quyết định</h2><p>Đọc pain, bằng chứng và phạm vi trước khi duyệt.</p></div></div>
+          <div id="decisionDetail" class="panel decision-detail-top hidden"></div>
           <div id="requestDetail" class="panel hidden"></div>
           <div id="approvalCards" class="decision-grid"></div>
         </section>
@@ -120,15 +121,14 @@
             <div><span class="eyebrow">HỒ SƠ R&amp;D</span><h2>Danh mục đang nghiên cứu</h2><p>Case, task, bằng chứng và trạng thái gate.</p></div>
             <button class="button secondary" onclick="openCreateRequest()">＋ Tạo yêu cầu</button>
           </div>
+          <div id="caseDetail" class="panel case-detail-top hidden"></div>
           <div class="tabs">
             <button class="tab active" data-case-tab="CASES" onclick="setCaseTab('CASES',this)">Hồ sơ</button>
             <button class="tab" data-case-tab="ALL" onclick="setCaseTab('ALL',this)">Thư viện</button>
             <button class="tab" data-case-tab="AI_PROPOSAL" onclick="setCaseTab('AI_PROPOSAL',this)">AI đề xuất</button>
-            <button class="tab" data-case-tab="WAITING_APPROVAL" onclick="setCaseTab('WAITING_APPROVAL',this)">Chờ duyệt</button>
           </div>
           <div id="caseList" class="card-list"></div>
           <div id="candidateLibrary" class="candidate-list hidden"></div>
-          <div id="caseDetail" class="panel hidden"></div>
         </section>
 
         <section id="view-agents" class="view">
