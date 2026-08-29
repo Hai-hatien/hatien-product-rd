@@ -30,3 +30,15 @@ UI release evidence:
 - Scope expanded to the full Hà Tiên ecosystem; four priority families pinned.
 - Family container references come from Kế hoạch HTG - STG - HTC 2026 and are not issued Product/Model/SKU codes.
 - Gemini Worker R0-R8 shown separately from externally orchestrated specialist model assignments.
+
+DEPLOY_COMMAND_CENTER_CTA_FLOW_V1=2026-08-29T15:30:00+07:00
+
+CTA/UI release evidence:
+- Source commit: 2326de0b1a2d0b8b75a0e31385e1ed6a591a96f1.
+- BA/PO/CMO decision-first flow: one CTA equals one business intent.
+- Overview "Xem" opens the exact decision detail instead of a generic list jump.
+- New request opens the exact request detail after create.
+- Research approval stays in Decision Desk, shows receipt, and only opens case through an explicit CTA.
+- Case detail is top-level inside Hồ sơ R&D; list/tabs are hidden while detail is open, and Back restores prior context.
+- Hồ sơ R&D no longer duplicates approval queue as a "Chờ duyệt" tab.
+- Priority selection is separated from research approval.
