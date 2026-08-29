@@ -41,7 +41,9 @@ function verifyCanonicalRuntimeConfig_() {
     { name: 'existing deployment coordinate', ok: value('APPS_SCRIPT_DEPLOYMENT_ID') === RD_CANONICAL.EXISTING_DEPLOYMENT_ID, actual: value('APPS_SCRIPT_DEPLOYMENT_ID') },
     { name: 'Gemini provider', ok: value('MODEL_PROVIDER') === 'GEMINI' && value('AI_PROVIDER') === 'GEMINI', actual: value('MODEL_PROVIDER') + '|' + value('AI_PROVIDER') },
     { name: 'legacy OpenAI retired', ok: value('LEGACY_OPENAI_STATUS') === 'RETIRED_NOT_USED', actual: value('LEGACY_OPENAI_STATUS') },
-    { name: 'backend gate not falsely ready', ok: value('BACKEND_READY') !== 'TRUE', actual: value('BACKEND_READY') }
+    { name: 'canonical source version', ok: value('CANONICAL_VERSION') === RD_CANONICAL.SOURCE_VERSION, actual: value('CANONICAL_VERSION') },
+    { name: 'canonical deployment recorded', ok: /^DEPLOYED_VERSION_\d+$/.test(value('CANONICAL_APPS_SCRIPT_PUSH_STATUS')), actual: value('CANONICAL_APPS_SCRIPT_PUSH_STATUS') },
+    { name: 'backend gate matches canonical release', ok: value('BACKEND_READY') === String(RD_CANONICAL.BACKEND_READY).toUpperCase(), actual: value('BACKEND_READY') }
   ];
   return { ok: checks.every(check => check.ok), checks, missing: checks.filter(check => !check.ok).map(check => check.name) };
 }
@@ -61,12 +63,14 @@ function verifyGeminiRuntime_() {
 function verifyAppsScriptCoordinate_() {
   const actualScriptId = String(ScriptApp.getScriptId() || '');
   const serviceUrl = String(ScriptApp.getService().getUrl() || '');
+  const deploymentRecorded = /^DEPLOYED_VERSION_\d+$/.test(runtimeConfigValue_('CANONICAL_APPS_SCRIPT_PUSH_STATUS'));
+  const coordinateMatches = serviceUrl.includes(RD_CANONICAL.EXISTING_DEPLOYMENT_ID);
   return {
     scriptIdMatches: actualScriptId === RD_CANONICAL.APPS_SCRIPT_ID,
     actualScriptId,
     serviceUrl,
-    existingDeploymentCoordinatePresent: serviceUrl.includes(RD_CANONICAL.EXISTING_DEPLOYMENT_ID),
-    canonicalDeployProven: false
+    existingDeploymentCoordinatePresent: coordinateMatches,
+    canonicalDeployProven: coordinateMatches && deploymentRecorded && RD_CANONICAL.BACKEND_READY === true
   };
 }
 
@@ -87,6 +91,7 @@ function verifyRuntimePrerequisites() {
     canonicalConfig: canonicalConfig.ok,
     geminiApiKey: gemini.configured,
     appsScriptId: appsScript.scriptIdMatches,
+    canonicalDeployment: appsScript.canonicalDeployProven,
     flowSchedule: flowSchedule.ok,
     triggersInstalled: triggers.installed,
     idIntegrity: Boolean(idIntegrity.ok)
@@ -114,6 +119,6 @@ function verifyRuntimePrerequisites() {
     triggers,
     idIntegrity,
     auditId,
-    note: 'PENDING/ENABLED không được gọi RUNNING; canonicalDeployProven vẫn FALSE cho đến clasp push/deployment proof.'
+    note: ready ? 'Production runtime verified from canonical deployment, trigger, Gemini and integrity evidence.' : 'Thiếu ít nhất một bằng chứng runtime bắt buộc; hệ thống fail-closed.'
   };
 }
