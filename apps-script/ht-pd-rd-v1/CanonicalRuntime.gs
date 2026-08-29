@@ -5,7 +5,7 @@
 const RD_CANONICAL = Object.freeze({
   REPOSITORY: 'Hai-hatien/hatien-product-rd',
   BRANCH: 'backend/v1.3-hardening',
-  SOURCE_VERSION: '1.3.2-p0',
+  SOURCE_VERSION: '1.3.3-worker-v1',
   APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL',
   EXISTING_DEPLOYMENT_ID: 'AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy',
   EXISTING_WEB_APP_URL: 'https://script.google.com/a/macros/hatiencorp.vn/s/AKfycbyfMvQKqkRD7NMHIE2S9Hy-8YdA02pwNLR70L62N11L3b4rdHM7yxBLzfWkTCtoO4Sy/exec',

@@ -33,6 +33,8 @@ jobs:
           for f in /tmp/ht-pd-rd-js/*.js; do node --check "$f"; done
       - name: Agent model routing contract
         run: node tests/agent_model_policy.test.js
+      - name: Gemini scheduled worker contract
+        run: node tests/gemini_flow_worker.test.js
       - name: Browser client parse and generated-handler contract
         run: node tests/client_ui_contract.test.js
       - name: Backend behavior contracts

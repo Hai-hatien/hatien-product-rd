@@ -76,8 +76,18 @@ mustContain('RuntimeConfigService.gs', [
   'verifyRuntimePrerequisites'
 ]);
 
+mustContain('FlowWorkerService.gs', [
+  'callGeminiFlowWorker_',
+  "headers: { 'x-goog-api-key': runtime.apiKey }",
+  "responseMimeType: 'application/json'",
+  "STATUS: 'HANDOFF_READY'",
+  "IMPORT_STATUS: 'REPORT_ONLY_V1'",
+  'Kế hoạch HTG - STG - HTC 2026'
+]);
+mustNotContain('FlowWorkerService.gs', ["STATUS: 'COMPLETED'", 'GATE_APPROVED']);
+
 mustContain('AutomationService.gs', [
-  'runScheduledFlowProbe_',
+  'runScheduledFlowWorker_',
   "runR1Scheduled()",
   "runR2Scheduled()",
   "runR3Scheduled()",
@@ -87,9 +97,13 @@ mustContain('AutomationService.gs', [
   "runR7Scheduled()",
   "runR8Scheduled()",
   'runR0DailySummary()',
-  'READY_WORK_DETECTED',
-  'NO_READY_WORK'
+  "apiStatus = completed.length ? 'CALLED' : 'CALL_FAILED'",
+  "nextFlow: 'HUMAN_REVIEW_REQUIRED'"
 ]);
+mustNotContain('AutomationService.gs', ['WORKER_EXECUTION_REQUIRED', 'runScheduledFlowProbe_']);
+
+mustContain('OpenAiAgentService.gs', ['RETIRED_NOT_USED']);
+mustNotContain('OpenAiAgentService.gs', ['OPENAI_API_KEY', 'api.openai.com']);
 
 mustContain('UatBackendTestService.gs', [
   'permission matrix ht/gpt/youtube1/unknown fail-closed',
@@ -115,6 +129,7 @@ assert(deploy.includes('workflow_dispatch'), 'canonical deployment must retain e
 assert(deploy.includes("- '.backend-uat-deploy-ready'"), 'push deploy trigger must be scoped only to backend UAT marker');
 assert(deploy.includes("APPS_SCRIPT_ID: '1TGVEpC82jSws4y6lzl2vHSZ8Z8H0dkHhUFLY5_oPaSdCbY7e4knbqsfL'"), 'deploy must use verified lowercase-l Script ID');
 assert(deploy.includes('TARGET_OWNERSHIP_PRECHECK=PASS'), 'deploy must verify target deployment ownership before mutation');
+assert(deploy.includes('FlowWorkerService.gs'), 'deploy must require the Gemini worker');
 assert(deploy.includes("find remote-script -maxdepth 1 -type f -name '*.js' -delete"), 'post-backend release deploy must rebuild canonical JS package');
 assert(deploy.includes('cp "$ROOT_DIR/Index.html" remote-script/Index.html'), 'canonical UI Index must be deployed');
 assert(deploy.includes('cp "$ROOT_DIR/Client.html" remote-script/Client.html'), 'canonical UI Client must be deployed');

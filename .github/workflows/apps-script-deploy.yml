@@ -46,7 +46,7 @@ jobs:
       - name: Validate runtime and UX package
         run: |
           set -euo pipefail
-          for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs AutomationService.gs DashboardService.gs Code.gs Index.html Client.html Styles.html appsscript.json; do
+          for f in Config.gs CanonicalRuntime.gs Core.gs AuthService.gs RequestService.gs DecisionAuditService.gs WorkflowService.gs AuditIntegrityService.gs FlowScheduleService.gs MarketScoutService.gs RuntimeConfigService.gs UatBackendTestService.gs FlowWorkerService.gs AutomationService.gs DashboardService.gs Code.gs Index.html Client.html Styles.html appsscript.json; do
             test -f "$ROOT_DIR/$f" || { echo "Missing canonical file: $f"; exit 1; }
           done
           for handler in runR1Scheduled runR2Scheduled runR3Scheduled runR4Scheduled runR5Scheduled runR6Scheduled runR7Scheduled runR8Scheduled runR0DailySummary; do
@@ -97,6 +97,7 @@ jobs:
           cp "$ROOT_DIR/Styles.html" remote-script/Styles.html
           test -f remote-script/Code.js
           test -f remote-script/DashboardService.js
+          test -f remote-script/FlowWorkerService.js
           test -f remote-script/Index.html
           test -f remote-script/Client.html
           test -f remote-script/Styles.html
@@ -116,7 +117,7 @@ jobs:
         working-directory: remote-script
         run: |
           set -euo pipefail
-          OUT="$(clasp create-version "HT-PD-RD canonical UAT ${GITHUB_SHA}" 2>&1)"
+          OUT="$(clasp create-version "HT-PD-RD Gemini Worker V1 ${GITHUB_SHA}" 2>&1)"
           echo "$OUT"
           VERSION="$(printf '%s' "$OUT" | grep -Eo '[0-9]+' | tail -1)"
           test -n "$VERSION" || { echo 'Could not parse Apps Script version.'; exit 1; }
@@ -129,7 +130,7 @@ jobs:
           clasp create-deployment \
             --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" \
             --versionNumber "${{ steps.version.outputs.number }}" \
-            --description "HT-PD-RD canonical UAT ${GITHUB_SHA}"
+            --description "HT-PD-RD Gemini Worker V1 ${GITHUB_SHA}"
 
       - name: Verify deployment coordinate
         working-directory: remote-script
@@ -140,4 +141,4 @@ jobs:
           echo "CANONICAL_SOURCE_SHA=$GITHUB_SHA"
           echo "APPS_SCRIPT_VERSION=${{ steps.version.outputs.number }}"
           echo "WEB_APP=https://script.google.com/a/macros/hatiencorp.vn/s/${APPS_SCRIPT_DEPLOYMENT_ID}/exec"
-          echo 'CANONICAL_MOBILE_UX_DEPLOYED=YES'
+          echo 'GEMINI_FLOW_WORKER_V1_DEPLOYED=YES'

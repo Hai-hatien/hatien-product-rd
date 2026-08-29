@@ -1,8 +1,6 @@
 /**
- * Scheduler plumbing for R0-R8.
- * P0 rule: a trigger firing is execution evidence, but it is NOT evidence that
- * research/engineering work is complete. These handlers never fabricate flow
- * outputs. They log actual invocation and expose ready work for the worker layer.
+ * Scheduled R0-R8 execution.
+ * Trigger evidence and model execution evidence are written separately and truthfully.
  */
 function flowScheduleRow_(flowId) {
   const row = readFlowSchedule_().find(item => String(item.FLOW_ID || '') === String(flowId));
@@ -10,8 +8,12 @@ function flowScheduleRow_(flowId) {
   return row;
 }
 
+function schedulerRunId_(flowId) {
+  return 'RUN-' + flowId + '-' + todayKey_() + '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+}
+
 function appendSchedulerRunLog_(input) {
-  const runId = 'RUN-' + input.flowId + '-' + todayKey_() + '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+  const runId = input.runId || schedulerRunId_(input.flowId);
   appendObject_(RD_CONFIG.SHEETS.FLOW_RUN_LOG, {
     RUN_ID: runId,
     FLOW_ID: input.flowId,
@@ -54,15 +56,16 @@ function activeCaseIds_() {
     .filter(Boolean);
 }
 
-function runScheduledFlowProbe_(flowId) {
+function runScheduledFlowWorker_(flowId) {
   const schedule = flowScheduleRow_(flowId);
   const startedAt = nowIso_();
   const handler = String(schedule.HANDLER || '');
   const triggerId = installedTriggerIdForHandler_(handler);
+  const runId = schedulerRunId_(flowId);
 
   if (String(schedule.ENABLED || '').toUpperCase() !== 'TRUE') {
-    const runId = appendSchedulerRunLog_({
-      flowId, startedAt, finishedAt: nowIso_(), triggerId,
+    appendSchedulerRunLog_({
+      runId, flowId, startedAt, finishedAt: nowIso_(), triggerId,
       runStatus: 'DISABLED', dependencyStatus: 'NOT_EVALUATED',
       notes: 'Flow disabled in 95_Flow_Schedule; no work executed.'
     });
@@ -70,56 +73,92 @@ function runScheduledFlowProbe_(flowId) {
   }
 
   const actor = getSystemActor_();
-  const caseIds = activeCaseIds_();
-  caseIds.forEach(caseId => reconcileDependencies_(caseId, actor));
+  activeCaseIds_().forEach(caseId => reconcileDependencies_(caseId, actor));
   const ready = readyTasksForFlow_(flowId);
-  const readyCaseIds = [...new Set(ready.map(row => String(row.RD_CASE_ID || '')).filter(Boolean))];
 
-  const status = ready.length ? 'READY_WORK_DETECTED' : 'NO_READY_WORK';
-  const dependencyStatus = ready.length ? 'READY' : 'WAITING_OR_EMPTY';
+  if (!ready.length) {
+    const auditId = appendAudit_({
+      actor,
+      action: 'SCHEDULED_FLOW_WORKER',
+      entityType: 'FLOW',
+      entityId: flowId,
+      beforeState: 'TRIGGER_INVOKED',
+      afterState: 'NO_READY_WORK',
+      evidenceRef: triggerId,
+      result: 'RECORDED',
+      notes: JSON.stringify({ readyTaskIds: [] })
+    });
+    appendSchedulerRunLog_({
+      runId, flowId, startedAt, finishedAt: nowIso_(), triggerId,
+      dependencyStatus: 'WAITING_OR_EMPTY', apiStatus: 'NOT_CALLED',
+      runStatus: 'NO_READY_WORK', auditId,
+      notes: JSON.stringify({ readyTaskIds: [], truthfulStatus: true })
+    });
+    updateObjectById_(RD_CONFIG.SHEETS.FLOW_SCHEDULE, 'FLOW_ID', flowId, {
+      LAST_RUN_AT: nowIso_(), LAST_RUN_STATUS: 'NO_READY_WORK',
+      TRIGGER_STATUS: triggerId ? 'INSTALLED' : 'PENDING_INSTALL'
+    });
+    return { ok: true, flowId, runId, status: 'NO_READY_WORK', readyTaskCount: 0 };
+  }
+
+  const limit = Math.max(1, Number(RD_CONFIG.GEMINI.MAX_TASKS_PER_RUN || 1));
+  const selected = ready.slice(0, limit);
+  const results = selected.map(task => executeReadyTaskWorker_(flowId, task, schedule, runId));
+  const completed = results.filter(item => item.status === 'HANDOFF_READY');
+  const failed = results.filter(item => item.status === 'ERROR');
+  const reportIds = completed.map(item => item.reportId);
+  const runStatus = failed.length
+    ? (completed.length ? 'WORKER_PARTIAL_SUCCESS' : 'WORKER_FAILED')
+    : 'WORKER_COMPLETED';
+  const apiStatus = completed.length ? 'CALLED' : 'CALL_FAILED';
+  const readyCaseIds = [...new Set(selected.map(row => String(row.RD_CASE_ID || '')).filter(Boolean))];
   const auditId = appendAudit_({
     actor,
-    action: 'SCHEDULED_FLOW_PROBE',
+    action: 'SCHEDULED_FLOW_WORKER',
     entityType: 'FLOW',
     entityId: flowId,
-    beforeState: 'TRIGGER_INVOKED',
-    afterState: status,
-    evidenceRef: triggerId,
-    result: 'RECORDED',
-    notes: JSON.stringify({ readyTaskIds: ready.map(row => row.TASK_ID), readyCaseIds })
+    beforeState: 'READY_WORK_DETECTED',
+    afterState: runStatus,
+    evidenceRef: reportIds.join('|') || triggerId,
+    result: failed.length ? 'NEEDS_ACTION' : 'RECORDED',
+    notes: JSON.stringify({ results, unprocessedReadyCount: Math.max(0, ready.length - selected.length) })
   });
-  const runId = appendSchedulerRunLog_({
+  appendSchedulerRunLog_({
+    runId,
     flowId,
+    caseId: readyCaseIds.length === 1 ? readyCaseIds[0] : '',
     startedAt,
     finishedAt: nowIso_(),
     triggerId,
-    dependencyStatus,
-    runStatus: status,
+    dependencyStatus: 'READY',
+    apiStatus,
+    reportId: reportIds.join('|'),
+    recordsImported: 0,
+    nextFlow: 'HUMAN_REVIEW_REQUIRED',
+    runStatus,
+    errorCode: failed.length ? 'GEMINI_WORKER_ERROR' : '',
+    errorMessage: failed.map(item => item.taskId + ': ' + item.error).join(' | '),
     auditId,
-    nextFlow: ready.length ? flowId + ':WORKER_EXECUTION_REQUIRED' : '',
-    notes: JSON.stringify({ readyTaskIds: ready.map(row => row.TASK_ID), readyCaseIds, truthfulStatus: true })
+    notes: JSON.stringify({ results, readyCaseIds, unprocessedReadyCount: Math.max(0, ready.length - selected.length), truthfulStatus: true })
   });
-
-  // Reflect actual invocation, not a claimed completed research run.
   updateObjectById_(RD_CONFIG.SHEETS.FLOW_SCHEDULE, 'FLOW_ID', flowId, {
-    LAST_RUN_AT: nowIso_(),
-    LAST_RUN_STATUS: status,
+    LAST_RUN_AT: nowIso_(), LAST_RUN_STATUS: runStatus,
     TRIGGER_STATUS: triggerId ? 'INSTALLED' : 'PENDING_INSTALL'
   });
-  return { ok: true, flowId, runId, status, readyTaskCount: ready.length, readyCaseIds, triggerId };
+  return { ok: failed.length === 0, flowId, runId, status: runStatus, apiStatus, reportIds, results };
 }
 
-function runR1Scheduled() { return runScheduledFlowProbe_('R1'); }
-function runR2Scheduled() { return runScheduledFlowProbe_('R2'); }
-function runR3Scheduled() { return runScheduledFlowProbe_('R3'); }
-function runR4Scheduled() { return runScheduledFlowProbe_('R4'); }
-function runR5Scheduled() { return runScheduledFlowProbe_('R5'); }
-function runR6Scheduled() { return runScheduledFlowProbe_('R6'); }
-function runR7Scheduled() { return runScheduledFlowProbe_('R7'); }
-function runR8Scheduled() { return runScheduledFlowProbe_('R8'); }
+function runR1Scheduled() { return runScheduledFlowWorker_('R1'); }
+function runR2Scheduled() { return runScheduledFlowWorker_('R2'); }
+function runR3Scheduled() { return runScheduledFlowWorker_('R3'); }
+function runR4Scheduled() { return runScheduledFlowWorker_('R4'); }
+function runR5Scheduled() { return runScheduledFlowWorker_('R5'); }
+function runR6Scheduled() { return runScheduledFlowWorker_('R6'); }
+function runR7Scheduled() { return runScheduledFlowWorker_('R7'); }
+function runR8Scheduled() { return runScheduledFlowWorker_('R8'); }
 
 function runR0DailySummary() {
-  const flowProbe = runScheduledFlowProbe_('R0');
+  const worker = runScheduledFlowWorker_('R0');
   const actor = getSystemActor_();
   const openDecisions = listOpenDecisions_();
   const openTasks = readObjects_(RD_CONFIG.SHEETS.TASKS)
@@ -132,11 +171,11 @@ function runR0DailySummary() {
     entityId: 'R0',
     beforeState: '',
     afterState: JSON.stringify({ openDecisionCount: openDecisions.length, openTaskCount: openTasks.length, blockerCount: blockers.length }),
-    evidenceRef: flowProbe.runId,
+    evidenceRef: worker.runId,
     result: 'RECORDED',
     notes: 'Aggregation only; no gate decision is auto-approved.'
   });
-  return Object.assign({}, flowProbe, {
+  return Object.assign({}, worker, {
     openDecisionCount: openDecisions.length,
     openTaskCount: openTasks.length,
     blockerCount: blockers.length
