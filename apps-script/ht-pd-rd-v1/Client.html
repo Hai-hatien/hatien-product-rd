@@ -1,10 +1,27 @@
 <script>
+const LANGUAGE_DICTIONARY = {
+  vi: { toggle: 'Tiếng Anh', toggleLabel: 'Đổi sang tiếng Anh', overview: 'Tổng quan', approvals: 'Cần quyết định', cases: 'Hồ sơ nghiên cứu', agents: 'Điều phối bộ xử lý', technical: 'Hệ thống', loading: 'Đang đọc dữ liệu mới nhất…', environment: 'Môi trường kiểm thử', noDecision: 'Không có việc cần quyết định.', noAccess: 'Không có quyền truy cập' },
+  en: { toggle: 'Tiếng Việt', toggleLabel: 'Switch to Vietnamese', overview: 'Overview', approvals: 'Decisions', cases: 'Research files', agents: 'Automated operations', technical: 'System', loading: 'Reading the latest data…', environment: 'Test environment', noDecision: 'There is no decision needed.', noAccess: 'Access is not available' }
+};
+let languageMode = 'vi';
+function t(key) { return (LANGUAGE_DICTIONARY[languageMode] && LANGUAGE_DICTIONARY[languageMode][key]) || key; }
+function toggleLanguage() {
+  languageMode = languageMode === 'vi' ? 'en' : 'vi';
+  applyLanguage();
+  if (appData) renderApp();
+}
+function applyLanguage() {
+  const button = document.getElementById('languageToggle');
+  if (button) { button.textContent = t('toggle'); button.setAttribute('aria-label', t('toggleLabel')); }
+  document.documentElement.lang = languageMode;
+}
+
 let appData = null;
 let activeLibraryTab = 'ALL';
 let activeCaseTab = 'CASES';
 let caseReturnState = null;
 
-document.addEventListener('DOMContentLoaded', reloadData);
+document.addEventListener('DOMContentLoaded', () => { applyLanguage(); reloadData(); });
 
 function gas(method, ...args) {
   return new Promise((resolve, reject) => {
@@ -13,7 +30,7 @@ function gas(method, ...args) {
 }
 
 async function reloadData() {
-  setNotice('Đang đọc dữ liệu thật từ R&D Master…');
+  setNotice(t('loading'));
   try {
     appData = await gas('getBootstrapData');
     renderApp();
@@ -26,7 +43,7 @@ async function reloadData() {
 function renderApp() {
   const data = appData || {};
   if (data.restricted) {
-    document.querySelector('.content').innerHTML = '<div class="notice error">' + esc(data.message || 'Không có quyền truy cập') + '</div>';
+    document.querySelector('.content').innerHTML = '<div class="notice error">' + esc(data.message || t('noAccess')) + '</div>';
     return;
   }
 
@@ -35,7 +52,7 @@ function renderApp() {
   const sidebarUser = document.getElementById('sidebarUser');
   if (sidebarUser) sidebarUser.textContent = actor.displayName || actor.email || 'Người dùng';
   const envBadge = document.getElementById('environmentBadge');
-  if (envBadge) envBadge.textContent = environment;
+  if (envBadge) envBadge.textContent = languageMode === 'vi' ? t('environment') : environment;
   const techNav = document.getElementById('techNav');
   if (techNav) techNav.classList.toggle('hidden', !(actor.permissions && actor.permissions.technicalOperate));
 
@@ -118,8 +135,8 @@ function renderDecisions(cards) {
   const approvals = document.getElementById('approvalCards');
   const count = document.getElementById('decisionNavCount');
   if (count) count.textContent = String(cards.length || 0);
-  if (overview) overview.innerHTML = top.length ? top.map(renderDecisionList).join('') : emptyState('Không có việc cần quyết định.');
-  if (approvals) approvals.innerHTML = cards.length ? cards.map(renderDecisionCard).join('') : emptyState('Không có việc cần quyết định.');
+  if (overview) overview.innerHTML = top.length ? top.map(renderDecisionList).join('') : emptyState(t('noDecision'));
+  if (approvals) approvals.innerHTML = cards.length ? cards.map(renderDecisionCard).join('') : emptyState(t('noDecision'));
 }
 
 function renderDecisionList(card) {
@@ -619,7 +636,7 @@ function showView(name, button) {
   document.querySelectorAll('[data-view]').forEach(nav => nav.classList.toggle('active', nav.dataset.view === name));
   if (button) button.classList.add('active');
   const title = document.getElementById('screenTitle');
-  const titles = { overview: 'Tổng quan', approvals: 'Cần quyết định', cases: 'Hồ sơ R&D', agents: 'Điều phối agent', technical: 'Hệ thống' };
+  const titles = { overview: t('overview'), approvals: t('approvals'), cases: t('cases'), agents: t('agents'), technical: t('technical') };
   if (title) title.textContent = titles[name] || 'Command Center';
   const opts = arguments[2] || {};
   if (!opts.preserveScroll && !alreadyActive) window.scrollTo({ top: 0, behavior: 'smooth' });

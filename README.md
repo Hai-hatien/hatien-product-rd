@@ -60,3 +60,9 @@ No Apps Script/OAuth secret belongs in repository files or logs. GitHub source a
 ## Environment
 
 Current target: **UAT**. Static source or a GitHub commit is not deployment evidence.
+
+## Giao diện Product R&D song ngữ
+
+Source giao diện độc lập nằm trong `apps-script/ht-pd-rd-v1/`, không dùng repo Market/PR-MKT. Tiếng Việt là chế độ mặc định; tiếng Anh là chế độ phụ qua nút đổi ngôn ngữ. Bước đầu chỉ đọc và tóm tắt dữ liệu từ R&D Master, không ghi Sheet, không tạo sản phẩm, không ghi CRM và không đăng WordPress.
+
+Mã cột và mã trạng thái kỹ thuật được giữ nguyên trong phần xử lý nền; chỉ nhãn hiển thị được dịch qua từ điển trong `Client.html`.

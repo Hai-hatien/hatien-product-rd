@@ -11,7 +11,7 @@
     <aside class="sidebar" aria-label="Điều hướng">
       <div class="brand">
         <img src="https://hatiencorp.vn/wp-content/uploads/2020/05/logo-web-hatien-corp.png" alt="Hà Tiên Corp">
-        <div class="brand-subtitle">R&amp;D SẢN PHẨM MỚI</div>
+        <div class="brand-subtitle">NGHIÊN CỨU VÀ PHÁT TRIỂN SẢN PHẨM</div>
       </div>
 
       <div class="scope-card">
@@ -41,8 +41,9 @@
           <h1 id="screenTitle">Tổng quan</h1>
         </div>
         <div class="header-actions">
-          <span id="environmentBadge" class="chip">PRODUCTION</span>
+          <span id="environmentBadge" class="chip">MÔI TRƯỜNG KIỂM THỬ</span>
           <span id="runtimeBadge" class="chip muted">Đang kiểm tra</span>
+          <button id="languageToggle" class="button secondary" type="button" onclick="toggleLanguage()" aria-label="Đổi sang tiếng Anh">Tiếng Anh</button>
           <button class="icon-button" type="button" onclick="reloadData()" title="Làm mới">↻</button>
           <button class="button primary" type="button" onclick="openCreateRequest()">＋ Tạo yêu cầu R&amp;D</button>
         </div>
@@ -54,12 +55,12 @@
         <section id="view-overview" class="view active">
           <div id="runtimeBanner" class="runtime-banner">
             <div class="banner-icon">✓</div>
-            <div><strong>Đang xác minh Worker và lịch R0–R8…</strong><p>Dữ liệu được đọc trực tiếp từ R&amp;D Master.</p></div>
+            <div><strong>Đang xác minh bộ xử lý tự động và lịch R0–R8…</strong><p>Dữ liệu được đọc trực tiếp từ sổ dữ liệu nghiên cứu.</p></div>
             <button class="link-button" onclick="showViewByName('technical')">Xem hệ thống →</button>
           </div>
 
           <div class="page-heading">
-            <div><span class="eyebrow">TỔNG QUAN ĐIỀU HÀNH R&amp;D</span><h2>Hôm nay cần quyết gì?</h2><p>Ưu tiên quyết định thật, blocker và hồ sơ đang chạy.</p></div>
+            <div><span class="eyebrow">TỔNG QUAN NGHIÊN CỨU VÀ PHÁT TRIỂN</span><h2>Hôm nay cần quyết gì?</h2><p>Ưu tiên quyết định thật, điểm nghẽn và hồ sơ đang chạy.</p></div>
             <button class="button secondary desktop-only" onclick="openCreateRequest()">＋ Tạo yêu cầu mới</button>
           </div>
 
@@ -69,7 +70,7 @@
             <div class="dashboard-main">
               <section class="panel">
                 <div class="panel-heading">
-                  <div><span class="eyebrow">CẦN ANH HẢI QUYẾT ĐỊNH</span><h3>Việc đang chặn luồng</h3><p>Quyết định đến hạn và gate đang chờ.</p></div>
+                  <div><span class="eyebrow">CẦN ANH HẢI QUYẾT ĐỊNH</span><h3>Việc đang chặn quy trình</h3><p>Quyết định đến hạn và điều kiện chặn đang chờ.</p></div>
                   <button class="link-button" onclick="showViewByName('approvals')">Xem tất cả →</button>
                 </div>
                 <div id="overviewDecisions" class="card-list"></div>
@@ -78,7 +79,7 @@
               <section class="panel">
                 <div class="panel-heading">
                   <div><span class="eyebrow">4 NHÓM CHỦ LỰC</span><h3>Phạm vi ưu tiên</h3><p>ID bên dưới là ID dòng nguồn từ kế hoạch 2026, không phải mã sản phẩm phát hành.</p></div>
-                  <span class="source-pill">SOURCE LOCK</span>
+                  <span class="source-pill">KHÓA NGUỒN</span>
                 </div>
                 <div id="priorityProducts" class="priority-products"></div>
               </section>
@@ -93,7 +94,7 @@
 
             <aside class="dashboard-aside">
               <section class="panel compact-panel">
-                <div class="panel-heading"><div><span class="eyebrow">SỨC KHỎE HỆ THỐNG</span><h3>Worker &amp; lịch</h3></div><span id="healthDot" class="status-dot"></span></div>
+                <div class="panel-heading"><div><span class="eyebrow">SỨC KHỎE HỆ THỐNG</span><h3>Bộ xử lý và lịch</h3></div><span id="healthDot" class="status-dot"></span></div>
                 <div id="runtimeHealth" class="health-list"></div>
               </section>
               <section class="panel compact-panel">
@@ -110,7 +111,7 @@
         </section>
 
         <section id="view-approvals" class="view">
-          <div class="page-heading"><div><span class="eyebrow">DECISION DESK</span><h2>Cần quyết định</h2><p>Đọc pain, bằng chứng và phạm vi trước khi duyệt.</p></div></div>
+          <div class="page-heading"><div><span class="eyebrow">KHU VỰC QUYẾT ĐỊNH</span><h2>Cần quyết định</h2><p>Đọc vấn đề, bằng chứng và phạm vi trước khi phê duyệt.</p></div></div>
           <div id="decisionDetail" class="panel decision-detail-top hidden"></div>
           <div id="requestDetail" class="panel hidden"></div>
           <div id="approvalCards" class="decision-grid"></div>
@@ -118,7 +119,7 @@
 
         <section id="view-cases" class="view">
           <div class="page-heading">
-            <div><span class="eyebrow">HỒ SƠ R&amp;D</span><h2>Danh mục đang nghiên cứu</h2><p>Case, task, bằng chứng và trạng thái gate.</p></div>
+            <div><span class="eyebrow">HỒ SƠ NGHIÊN CỨU</span><h2>Danh mục đang nghiên cứu</h2><p>Hồ sơ, việc cần làm, bằng chứng và điều kiện chặn.</p></div>
             <button class="button secondary" onclick="openCreateRequest()">＋ Tạo yêu cầu</button>
           </div>
           <div id="caseDetail" class="panel case-detail-top hidden"></div>
@@ -132,11 +133,11 @@
         </section>
 
         <section id="view-agents" class="view">
-          <div class="page-heading"><div><span class="eyebrow">AGENT OPERATIONS</span><h2>Điều phối agent</h2><p>R0–R8 chạy bằng Gemini Worker; agent chuyên môn dùng model policy riêng.</p></div></div>
+          <div class="page-heading"><div><span class="eyebrow">ĐIỀU PHỐI TỰ ĐỘNG</span><h2>Điều phối bộ xử lý</h2><p>R0–R8 chạy bằng bộ xử lý Gemini; mỗi vai trò chuyên môn có cấu hình riêng.</p></div></div>
           <div id="agentWorkerSummary" class="panel agent-worker-summary"></div>
           <div class="section-title-row"><div><span class="eyebrow">LỊCH SẢN PHẨM R0–R8</span><h3>Luồng kỹ thuật sản phẩm</h3></div></div>
           <div id="flowAgentGrid" class="flow-grid"></div>
-          <div class="section-title-row"><div><span class="eyebrow">AGENT CHUYÊN MÔN</span><h3>Model assignment</h3></div></div>
+          <div class="section-title-row"><div><span class="eyebrow">BỘ XỬ LÝ CHUYÊN MÔN</span><h3>Phân công mô hình</h3></div></div>
           <div id="agentAssignments" class="agent-table panel"></div>
         </section>
 
@@ -157,7 +158,7 @@
     <button class="active" data-view="overview" onclick="showView('overview',this)">⌂<span>Tổng quan</span></button>
     <button data-view="approvals" onclick="showView('approvals',this)">✓<span>Quyết định</span></button>
     <button data-view="cases" onclick="showView('cases',this)">▤<span>Hồ sơ</span></button>
-    <button data-view="agents" onclick="showView('agents',this)">⌘<span>Agent</span></button>
+    <button data-view="agents" onclick="showView('agents',this)">⌘<span>Bộ xử lý</span></button>
     <button data-view="technical" onclick="showView('technical',this)">⚙<span>Hệ thống</span></button>
   </nav>
   <button class="mobile-create" onclick="openCreateRequest()" aria-label="Tạo yêu cầu R&D">＋</button>

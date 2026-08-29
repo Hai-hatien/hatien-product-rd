@@ -8,7 +8,7 @@
 }
 *{box-sizing:border-box}
 html{font-size:15px}
-body{margin:0;background:var(--paper);color:var(--text);font:500 15px/1.5 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{margin:0;background:var(--paper);color:var(--text);font:500 15px/1.5 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 h1,h2,h3,h4,p{margin-top:0}
@@ -210,5 +210,11 @@ pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#222724;color
   .decision-head{display:grid}.decision-head .badge{width:max-content}.decision-facts{grid-template-columns:1fr}
   .agent-worker-summary{grid-template-columns:auto 1fr}.agent-worker-summary>.badge{grid-column:1/-1;width:max-content}
   .form-actions .button{flex:1}.panel{padding:13px}
+}
+@media(max-width:390px){
+  .header-actions{gap:5px}.header-actions .button{padding:8px 7px;font-size:10px}.topbar{padding-left:11px;padding-right:11px}
+}
+@media(max-width:360px){
+  .header-actions .icon-button{display:none}.header-actions .button{font-size:9px;padding:7px 5px}.content{padding-left:6px;padding-right:6px}
 }
 </style>
