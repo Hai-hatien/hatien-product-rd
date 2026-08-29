@@ -9,6 +9,7 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Điều hướng">
+      <button class="sidebar-close" type="button" onclick="closeMobileMenu()" aria-label="Đóng menu">×</button>
       <div class="brand">
         <img src="https://hatiencorp.vn/wp-content/uploads/2020/05/logo-web-hatien-corp.png" alt="Hà Tiên Corp">
         <div class="brand-subtitle">NGHIÊN CỨU VÀ PHÁT TRIỂN SẢN PHẨM</div>
@@ -37,6 +38,7 @@
     <div class="workspace">
       <header class="topbar">
         <div>
+          <button id="mobileMenuToggle" class="mobile-menu-toggle" type="button" onclick="toggleMobileMenu()" aria-label="Mở menu" aria-expanded="false" aria-controls="mobileSidebar">☰</button>
           <div class="top-kicker">TRUNG TÂM ĐIỀU HÀNH</div>
           <h1 id="screenTitle">Tổng quan</h1>
         </div>
@@ -153,6 +155,7 @@
       </main>
     </div>
   </div>
+  <div id="mobileMenuOverlay" class="mobile-menu-overlay" onclick="closeMobileMenu()" aria-hidden="true"></div>
 
   <nav class="mobile-nav" aria-label="Điều hướng di động">
     <button class="active" data-view="overview" onclick="showView('overview',this)">⌂<span>Tổng quan</span></button>

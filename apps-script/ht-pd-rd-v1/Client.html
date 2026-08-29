@@ -15,6 +15,18 @@ function applyLanguage() {
   if (button) { button.textContent = t('toggle'); button.setAttribute('aria-label', t('toggleLabel')); }
   document.documentElement.lang = languageMode;
 }
+function setMobileMenu(open) {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('mobileMenuOverlay');
+  const toggle = document.getElementById('mobileMenuToggle');
+  if (document.body) document.body.classList.toggle('mobile-menu-open', open);
+  if (sidebar) sidebar.classList.toggle('is-open', open);
+  if (overlay) { overlay.classList.toggle('is-open', open); overlay.setAttribute('aria-hidden', String(!open)); }
+  if (toggle) { toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? 'Đóng menu' : 'Mở menu'); }
+}
+function toggleMobileMenu() { setMobileMenu(!document.body.classList.contains('mobile-menu-open')); }
+function closeMobileMenu() { setMobileMenu(false); }
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMobileMenu(); });
 
 let appData = null;
 let activeLibraryTab = 'ALL';
@@ -630,6 +642,7 @@ async function runBehavioralUat() {
 }
 
 function showView(name, button) {
+  closeMobileMenu();
   const current = document.querySelector('.view.active');
   const alreadyActive = current && current.id === 'view-' + name;
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === 'view-' + name));
