@@ -1,17 +1,7 @@
 /**
- * Agent model policy for HT-PD-RD.
- *
- * User-facing labels such as "Extra high" are normalized to the OpenAI API
- * reasoning.effort value "xhigh".
- *
- * Resolution precedence is intentional:
- *   1) Explicit role mapping (BA/PO/PM/CMO/DEV/CONTENT_CREATOR/DESIGNER)
- *   2) Team fallback (MKT)
- *
- * This prevents a generic team label from silently changing a deliberately
- * assigned production role. If a Content Creator or Designer should use the
- * MKT xhigh profile, register that agent with an MKT-specific role instead of
- * the generic production role.
+ * Agent-model catalog for externally orchestrated specialist agents.
+ * This catalog is separate from the bound Apps Script scheduler, whose V1
+ * execution provider is Gemini (FlowWorkerService.gs).
  */
 const RD_AGENT_MODEL_POLICY = Object.freeze({
   provider: 'OPENAI',
@@ -23,7 +13,8 @@ const RD_AGENT_MODEL_POLICY = Object.freeze({
     CMO: Object.freeze({ model: 'gpt-5.6-sol', reasoningEffort: 'xhigh' }),
     DEV: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'medium' }),
     CONTENT_CREATOR: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'medium' }),
-    DESIGNER: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'medium' })
+    DESIGNER: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'medium' }),
+    TESTER: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'medium' })
   }),
   teamProfiles: Object.freeze({
     MKT: Object.freeze({ model: 'gpt-5.5', reasoningEffort: 'xhigh' })
@@ -45,7 +36,9 @@ function normalizeAgentRole_(value) {
     CREATOR: 'CONTENT_CREATOR',
     UI_DESIGNER: 'DESIGNER',
     UX_DESIGNER: 'DESIGNER',
-    UI_UX_DESIGNER: 'DESIGNER'
+    UI_UX_DESIGNER: 'DESIGNER',
+    QA_TESTER: 'TESTER',
+    SOFTWARE_TESTER: 'TESTER'
   };
   return aliases[compact] || compact;
 }
@@ -65,7 +58,6 @@ function resolveAgentModel_(agent) {
   agent = agent || {};
   const role = normalizeAgentRole_(agent.role || agent.roleCode || agent.agentRole);
   const team = normalizeAgentTeam_(agent.team || agent.teamCode || agent.agentTeam);
-
   const roleProfile = RD_AGENT_MODEL_POLICY.roleProfiles[role];
   const teamProfile = RD_AGENT_MODEL_POLICY.teamProfiles[team];
   const selected = roleProfile || teamProfile;
@@ -76,7 +68,6 @@ function resolveAgentModel_(agent) {
   if (!RD_AGENT_MODEL_POLICY.allowedEfforts.includes(selected.reasoningEffort)) {
     throw new Error('reasoningEffort không hợp lệ: ' + selected.reasoningEffort);
   }
-
   return {
     provider: RD_AGENT_MODEL_POLICY.provider,
     api: RD_AGENT_MODEL_POLICY.api,
@@ -96,6 +87,6 @@ function getAgentModelPolicySnapshot() {
     roleProfiles: RD_AGENT_MODEL_POLICY.roleProfiles,
     teamProfiles: RD_AGENT_MODEL_POLICY.teamProfiles,
     precedence: ['ROLE', 'TEAM'],
-    note: 'Extra high = xhigh trong OpenAI Responses API.'
+    note: 'Catalog cho agent điều phối ngoài Apps Script; Worker lịch R0-R8 dùng Gemini.'
   };
 }
