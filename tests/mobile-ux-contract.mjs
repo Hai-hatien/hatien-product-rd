@@ -9,6 +9,8 @@ const styles = fs.readFileSync(path.join(root, 'apps-script/ht-pd-rd-v1/Styles.h
 assert.match(index, /name="viewport"[^>]+width=device-width/);
 assert.match(index, /id="languageToggle"/);
 assert.match(styles, /overflow-x\s*:\s*hidden/);
+assert.match(styles, /Be\+Vietnam\+Pro/);
+assert.match(styles, /font-size:16px/);
 assert.match(styles, /@media\(max-width:390px\)/);
 assert.match(styles, /@media\(max-width:360px\)/);
 console.log('mobile-ux-contract: PASS (360/390)');
