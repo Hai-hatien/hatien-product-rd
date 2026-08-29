@@ -38,16 +38,27 @@ jobs:
       - name: Require dedicated Runtime Execution API credential
         env:
           CLASP_RUNTIME_JSON: ${{ secrets.CLASP_RUNTIME_JSON }}
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
         run: |
           set -euo pipefail
-          test -n "${CLASP_RUNTIME_JSON:-}" || {
-            echo 'Missing CLASP_RUNTIME_JSON. Runtime UAT requires OAuth created from the SAME standard Google Cloud project attached to the Apps Script project.'
+          AUTH_JSON="${CLASP_RUNTIME_JSON:-${CLASPRC_JSON:-}}"
+          test -n "$AUTH_JSON" || {
+            echo 'Missing both CLASP_RUNTIME_JSON and CLASPRC_JSON.'
             exit 1
           }
-          printf '%s' "$CLASP_RUNTIME_JSON" > "$HOME/.clasprc.json"
+          if [ -n "${CLASP_RUNTIME_JSON:-}" ]; then
+            AUTH_MODE='DEDICATED_RUNTIME'
+          else
+            AUTH_MODE='DEPLOY_FALLBACK'
+          fi
+          printf '%s' "$AUTH_JSON" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
           printf '{"scriptId":"%s","rootDir":".","projectId":"%s"}\n' "$APPS_SCRIPT_ID" "$RUNTIME_GCP_PROJECT_ID" > .clasp.json
-          clasp --user "$RUNTIME_USER_KEY" show-authorized-user --json > /tmp/runtime-user.json
+          if [ "$AUTH_MODE" = 'DEDICATED_RUNTIME' ]; then
+            clasp --user "$RUNTIME_USER_KEY" show-authorized-user --json > /tmp/runtime-user.json
+          else
+            clasp show-authorized-user --json > /tmp/runtime-user.json
+          fi
           node - <<'NODE'
           const x=require('/tmp/runtime-user.json');
           const email=x.email||x.user?.email||x.authorizedUser?.email||'UNKNOWN';
@@ -57,13 +68,18 @@ jobs:
           }
           console.log('RUNTIME_AUTH_USER='+email);
           NODE
+          echo "CLASP_RUNTIME_AUTH_MODE=$AUTH_MODE" >> "$GITHUB_ENV"
           echo 'RUNTIME_AUTH_PRECHECK=PASS'
 
       - name: Execute runtime prerequisite verifier through Apps Script Execution API
         run: |
           set -euo pipefail
           set +e
-          OUT="$(clasp --user "$RUNTIME_USER_KEY" run verifyRuntimePrerequisites --nondev 2>&1)"
+          if [ "$CLASP_RUNTIME_AUTH_MODE" = 'DEDICATED_RUNTIME' ]; then
+            OUT="$(clasp --user "$RUNTIME_USER_KEY" run verifyRuntimePrerequisites --nondev 2>&1)"
+          else
+            OUT="$(clasp run verifyRuntimePrerequisites --nondev 2>&1)"
+          fi
           RC=$?
           set -e
           printf '%s\n' "$OUT" | tee /tmp/runtime-prereq.txt
@@ -85,7 +101,11 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          OUT="$(clasp --user "$RUNTIME_USER_KEY" run runR1Scheduled 2>&1)"
+          if [ "$CLASP_RUNTIME_AUTH_MODE" = 'DEDICATED_RUNTIME' ]; then
+            OUT="$(clasp --user "$RUNTIME_USER_KEY" run runR1Scheduled 2>&1)"
+          else
+            OUT="$(clasp run runR1Scheduled 2>&1)"
+          fi
           RC=$?
           set -e
           printf '%s\n' "$OUT" | tee /tmp/runtime-worker.txt
