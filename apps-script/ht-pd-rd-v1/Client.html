@@ -32,6 +32,9 @@ let appData = null;
 let activeLibraryTab = 'ALL';
 let activeCaseTab = 'CASES';
 let caseReturnState = null;
+const articleApprovalState = Object.create(null);
+let activeArticlePreview = null;
+let activePreviewTab = 'display';
 
 document.addEventListener('DOMContentLoaded', () => { applyLanguage(); reloadData(); });
 
@@ -499,8 +502,21 @@ function openArticleProposal(candidateId) {
       ${articleProposalSection('Việc cần anh Hải quyết', firstValue(card.decisionQuestion, card.ownerQuestion, card.question))}
       ${articleProposalSection('Bước tiếp theo nếu đồng ý', firstValue(card.nextStep, card.nextSteps, card.followUp))}
     </div>${missing.length ? `<p class="proposal-missing">Chưa đủ cơ sở duyệt — cần bổ sung: ${esc(missing.join(', '))}</p>` : ''}`;
+  detail.innerHTML += `<div class="form-actions article-approval-actions"><button class="button secondary" type="button" onclick='approveArticleProposal(${JSON.stringify(candidateId)})' ${missing.length ? 'disabled' : ''}>Duyệt đề xuất bài viết</button><button class="button secondary" type="button" onclick='approveArticleContent(${JSON.stringify(candidateId)})' ${!articleState(candidateId).proposalApproved ? 'disabled' : ''}>Duyệt toàn bộ nội dung</button><button class="button" type="button" onclick='openArticleHtmlPreview(${JSON.stringify(candidateId)})' ${!articleState(candidateId).contentApproved ? 'disabled' : ''}>Xem trước HTML</button></div>`;
   detail.scrollIntoView && detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+function articleState(id) { return articleApprovalState[String(id)] || (articleApprovalState[String(id)] = { proposalApproved: false, contentApproved: false, previewOpened: false, htmlConfirmed: false }); }
+function refreshArticleProposal(id) { openArticleProposal(id); }
+function approveArticleProposal(id) { articleState(id).proposalApproved = true; refreshArticleProposal(id); setNotice('Đã duyệt đề xuất bài viết.'); }
+function approveArticleContent(id) { const state = articleState(id); if (!state.proposalApproved) return setNotice('Cần duyệt đề xuất trước.'); state.contentApproved = true; refreshArticleProposal(id); setNotice('Đã duyệt toàn bộ nội dung bài viết.'); }
+function articleCard(id) { return ((appData && appData.candidateLibrary) || []).find(item => String(item.candidateId || item.id || item.rdCaseId || item.title || '') === String(id)) || {}; }
+function articleFragment(card) { const title = userText(card.title || 'Bài viết nghiên cứu'); const summary = userText(card.summary || card.problem || card.pain || 'Nội dung đang chờ bổ sung.'); return `<article class="ht-article" data-standard="HATIENCORP_WEB_ARTICLE_STANDARD_v2.1"><h1>${esc(title)}</h1><p class="lead">${esc(summary)}</p><p>Nội dung này cần được rà soát trước khi công bố.</p></article>`; }
+function openArticleHtmlPreview(id) { const state = articleState(id); if (!state.proposalApproved || !state.contentApproved) return setNotice('Cần duyệt đề xuất và toàn bộ nội dung trước khi xem trước.'); activeArticlePreview = String(id); state.previewOpened = true; activePreviewTab = 'display'; const modal = document.getElementById('htmlPreviewModal'); if (modal) modal.classList.remove('hidden'); renderArticlePreview(); }
+function setPreviewTab(tab, button) { activePreviewTab = tab; document.querySelectorAll('[data-preview-tab]').forEach(item => item.classList.toggle('active', item.dataset.previewTab === tab)); if (button) button.classList.add('active'); renderArticlePreview(); }
+function renderArticlePreview() { const card = articleCard(activeArticlePreview); const fragment = articleFragment(card); const payload = { title: userText(card.title || ''), status: 'draft', content: fragment, contentType: 'html-fragment', standard: 'HATIENCORP_WEB_ARTICLE_STANDARD_v2.1' }; const display = document.getElementById('previewDisplay'); const fragmentEl = document.getElementById('previewFragment'); const webData = document.getElementById('previewWebData'); const contract = document.getElementById('previewContract'); if (display) display.innerHTML = fragment; if (fragmentEl) fragmentEl.textContent = fragment; if (webData) webData.textContent = JSON.stringify(payload, null, 2); if (contract) contract.innerHTML = '<p>Đạt: chỉ có mảnh nội dung, trạng thái bản nháp và đúng chuẩn hiển thị.</p><p>Chưa gửi: chưa có xác nhận của anh Hải.</p>'; const panels = { display, fragment: fragmentEl, webData, contract }; Object.entries(panels).forEach(([name, item]) => { if (item) item.classList.toggle('hidden', name !== activePreviewTab); }); const state = articleState(activeArticlePreview); const confirm = document.getElementById('htmlPreviewConfirm'); const send = document.getElementById('sendArticleDraft'); if (confirm) confirm.checked = state.htmlConfirmed; if (send) send.disabled = !(state.proposalApproved && state.contentApproved && state.previewOpened && state.htmlConfirmed); }
+function confirmHtmlPreview(confirmed) { articleState(activeArticlePreview).htmlConfirmed = Boolean(confirmed); renderArticlePreview(); }
+function closeHtmlPreview() { const modal = document.getElementById('htmlPreviewModal'); if (modal) modal.classList.add('hidden'); }
+function sendArticleDraft() { const state = articleState(activeArticlePreview); if (!state.proposalApproved || !state.contentApproved || !state.previewOpened || !state.htmlConfirmed) return setNotice('Chưa đủ điều kiện gửi bản nháp.'); const card = articleCard(activeArticlePreview); const payload = { title: userText(card.title || ''), status: 'draft', content: articleFragment(card), contentType: 'html-fragment', standard: 'HATIENCORP_WEB_ARTICLE_STANDARD_v2.1' }; setNotice('Bản nháp đã sẵn sàng để gửi theo quy trình. Không tự công bố.'); console.info('Article draft payload', payload); }
 function closeArticleProposal() { const detail = document.getElementById('articleProposalDetail'); if (detail) detail.classList.add('hidden'); }
 function articleProposalSection(title, value) {
   const items = asList(value);

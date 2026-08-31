@@ -167,6 +167,16 @@
   </nav>
   <button class="mobile-create" onclick="openCreateRequest()" aria-label="Tạo yêu cầu R&D">＋</button>
 
+  <div id="htmlPreviewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="htmlPreviewTitle">
+    <div class="modal-backdrop" onclick="closeHtmlPreview()"></div>
+    <div class="modal-card html-preview-card">
+      <div class="modal-header"><div><span class="eyebrow">XEM TRƯỚC NỘI DUNG</span><h2 id="htmlPreviewTitle">Kiểm tra bài viết trước khi gửi bản nháp</h2><p>Chỉ gửi mảnh nội dung, không tự công bố.</p></div><button class="modal-close" type="button" onclick="closeHtmlPreview()" aria-label="Đóng">×</button></div>
+      <div class="tabs preview-tabs"><button class="tab active" data-preview-tab="display" onclick="setPreviewTab('display',this)">Hiển thị</button><button class="tab" data-preview-tab="fragment" onclick="setPreviewTab('fragment',this)">Mã fragment</button><button class="tab" data-preview-tab="webData" onclick="setPreviewTab('webData',this)">Dữ liệu web</button><button class="tab" data-preview-tab="contract" onclick="setPreviewTab('contract',this)">Kiểm contract</button></div>
+      <div id="previewDisplay" class="preview-panel"></div><pre id="previewFragment" class="preview-panel hidden"></pre><pre id="previewWebData" class="preview-panel hidden"></pre><div id="previewContract" class="preview-panel hidden"></div>
+      <div class="form-actions preview-actions"><label><input id="htmlPreviewConfirm" type="checkbox" onchange="confirmHtmlPreview(this.checked)"> Tôi đã kiểm tra nội dung xem trước</label><button id="sendArticleDraft" class="button primary" type="button" onclick="sendArticleDraft()" disabled>Gửi bản nháp sang web</button></div>
+    </div>
+  </div>
+
   <div id="createModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="createModalTitle">
     <div class="modal-backdrop" onclick="closeCreateRequest()"></div>
     <div class="modal-card">
