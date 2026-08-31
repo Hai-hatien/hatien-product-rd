@@ -63,3 +63,15 @@ Mobile navigation release evidence:
 - User-facing font standard remains Be Vietnam Pro.
 - Minimum user-facing font size remains 16px.
 - This deploy does not change business approval logic, Sheet IDs, Product Master, CRM writes, or WordPress writes.
+
+DEPLOY_ARTICLE_APPROVAL_HTML_PREVIEW=2026-08-31T10:42+07:00
+
+Article approval and HTML preview release evidence:
+- Source commit: 763638b8ff0492872d73b665727f66caac4571da.
+- Adds article proposal approval and full article approval workflow.
+- Adds HTML preview modal with visible render, fragment, web payload, and contract checks.
+- Draft sending must remain locked until proposal approval, article approval, HTML preview, and HTML confirmation are complete.
+- WordPress/web sending remains draft-only; no automatic publishing is allowed.
+- Fragment output must follow HATIENCORP_WEB_ARTICLE_STANDARD v2.1 and must not include full-page HTML, inline style, script, header, or footer.
+- Vietnamese user interface must not expose internal enums or code labels.
+- Mobile off-canvas navigation, Be Vietnam Pro, and minimum 16px user-facing text remain locked.
