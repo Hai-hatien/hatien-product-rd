@@ -470,11 +470,55 @@ function renderLibrary() {
 function renderCandidate(card) {
   return `<article class="candidate-card">
     <div><div class="candidate-meta"><span>${esc(card.origin === 'AI' ? 'AI đề xuất' : 'Yêu cầu nội bộ')}</span><span>${esc(statusLabel(card.stage || card.statusGroup))}</span></div>
-    <h4>${esc(card.title || card.candidateId)}</h4><p>${esc(card.productScope || '')} • ${esc(card.customer || 'CHƯA BIẾT')}</p>
-    <div class="candidate-line"><b>Pain:</b> ${esc(card.pain || 'CHƯA BIẾT')}</div>
-    <div class="candidate-line"><b>Giá trị:</b> ${esc(card.value || 'CHƯA CÓ DỮ LIỆU')}</div></div>
-    ${card.rdCaseId ? "<button class=\"button secondary\" onclick='loadCase(" + JSON.stringify(card.rdCaseId) + ")'>Mở hồ sơ</button>" : ''}
+    <h4>${esc(userText(card.title || card.candidateId))}</h4><p>${esc(userText(card.productScope || ''))} • ${esc(userText(card.customer || 'CHƯA BIẾT'))}</p>
+    <div class="candidate-line"><b>Vấn đề:</b> ${esc(userText(card.pain || 'Chưa đủ cơ sở duyệt'))}</div>
+    <div class="candidate-line"><b>Giá trị:</b> ${esc(userText(card.value || 'Chưa đủ cơ sở duyệt'))}</div></div>
+    <button class="button secondary" onclick='openArticleProposal(${JSON.stringify(card.candidateId || card.id || card.title)})'>Xem hồ sơ đề xuất</button>
   </article>`;
+}
+
+function openArticleProposal(candidateId) {
+  const cards = (appData && appData.candidateLibrary) || [];
+  const card = cards.find(item => String(item.candidateId || item.id || item.title || '') === String(candidateId));
+  const detail = document.getElementById('articleProposalDetail');
+  if (!detail || !card) return showError(new Error('Không tìm thấy hồ sơ đề xuất trong dữ liệu hiện tại.'));
+  const missing = missingArticleProposalFields(card);
+  const source = firstValue(card.source, card.sourceRef, card.sourceUrl, card.evidenceSource);
+  detail.classList.remove('hidden');
+  detail.innerHTML = `<div class="panel-heading"><div><span class="eyebrow">HỒ SƠ ĐỀ XUẤT BÀI VIẾT</span><h3>${esc(userText(card.title || card.candidateId))}</h3></div><button class="button secondary" onclick="closeArticleProposal()">Đóng hồ sơ</button></div>
+    <div class="proposal-package article-proposal-package">
+      ${articleProposalSection('Kết luận đề xuất', firstValue(card.conclusion, card.recommendation, card.proposal, card.action))}
+      ${articleProposalSection('Vấn đề thị trường', firstValue(card.marketProblem, card.problem, card.pain))}
+      ${articleProposalSection('Người đọc chính', firstValue(card.primaryReader, card.targetAudience, card.customer, card.affectedGroups))}
+      ${articleProposalSection('Nỗi đau và quyết định của khách', firstValue(card.customerPain, card.pain, card.customerDecision))}
+      ${articleProposalSection('Cơ hội cho Hà Tiên', firstValue(card.opportunities, card.haTienOpportunity, card.businessOpportunity))}
+      ${articleProposalSection('Bằng chứng đang có', firstValue(card.evidence, source, card.evidenceSummary))}
+      ${articleProposalSection('Góc bài đề xuất', firstValue(card.articleAngle, card.contentAngle, card.angle))}
+      ${articleProposalSection('Cấu trúc bài nếu được duyệt', firstValue(card.articleStructure, card.outline, card.contentStructure))}
+      <div class="proposal-section"><h4>Rủi ro cần chặn</h4><ul><li>Không diễn đạt Hà Tiên như đơn vị cấp chứng nhận pháp lý.</li><li>Không dùng nội dung pháp luật hoặc tiêu chuẩn khi chưa được kiểm chứng.</li><li>Không tự tạo hoặc công bố bài viết.</li></ul></div>
+      ${articleProposalSection('Việc cần anh Hải quyết', firstValue(card.decisionQuestion, card.ownerQuestion, card.question))}
+      ${articleProposalSection('Bước tiếp theo nếu đồng ý', firstValue(card.nextStep, card.nextSteps, card.followUp))}
+    </div>${missing.length ? `<p class="proposal-missing">Chưa đủ cơ sở duyệt — cần bổ sung: ${esc(missing.join(', '))}</p>` : ''}`;
+  detail.scrollIntoView && detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeArticleProposal() { const detail = document.getElementById('articleProposalDetail'); if (detail) detail.classList.add('hidden'); }
+function articleProposalSection(title, value) {
+  const items = asList(value);
+  return `<div class="proposal-section"><h4>${esc(title)}</h4>${items.length ? `<ul>${items.map(item => `<li>${esc(userText(item))}</li>`).join('')}</ul>` : '<p class="proposal-empty">Chưa đủ cơ sở duyệt — cần bổ sung dữ liệu.</p>'}</div>`;
+}
+function missingArticleProposalFields(card) {
+  return [
+    ['kết luận đề xuất', firstValue(card.conclusion, card.recommendation, card.proposal, card.action)],
+    ['vấn đề thị trường', firstValue(card.marketProblem, card.problem, card.pain)],
+    ['người đọc chính', firstValue(card.primaryReader, card.targetAudience, card.customer, card.affectedGroups)],
+    ['nỗi đau và quyết định của khách', firstValue(card.customerPain, card.pain, card.customerDecision)],
+    ['cơ hội cho Hà Tiên', firstValue(card.opportunities, card.haTienOpportunity, card.businessOpportunity)],
+    ['bằng chứng', firstValue(card.evidence, card.source, card.sourceRef, card.sourceUrl, card.evidenceSource)],
+    ['góc bài đề xuất', firstValue(card.articleAngle, card.contentAngle, card.angle)],
+    ['cấu trúc bài', firstValue(card.articleStructure, card.outline, card.contentStructure)],
+    ['việc cần anh Hải quyết', firstValue(card.decisionQuestion, card.ownerQuestion, card.question)],
+    ['bước tiếp theo', firstValue(card.nextStep, card.nextSteps, card.followUp)]
+  ].filter(item => !item[1]).map(item => item[0]);
 }
 
 function setCaseTab(tab, button) {

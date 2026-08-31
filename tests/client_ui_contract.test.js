@@ -219,7 +219,7 @@ const candidateHtml = context.renderCandidate({
   value: 'UAT',
   evidenceCount: 1
 });
-assert(candidateHtml.includes("onclick='loadCase(\"RDCASE-20260828-0001\")'"), 'candidate handler quoting invalid');
-assert(!candidateHtml.includes('onclick="loadCase("'), 'candidate handler has broken nested double quotes');
+assert(candidateHtml.includes("onclick='openArticleProposal(\"RDCASE-20260828-0001\")'"), 'proposal dossier handler quoting invalid');
+assert(!candidateHtml.includes('onclick="openArticleProposal("'), 'proposal dossier handler has broken nested double quotes');
 
 console.log('CLIENT_UI_CONTRACT=PASS');
