@@ -21,8 +21,8 @@ function setMobileMenu(open) {
   const toggle = document.getElementById('mobileMenuToggle');
   if (document.body) document.body.classList.toggle('mobile-menu-open', open);
   if (sidebar) sidebar.classList.toggle('is-open', open);
-  if (overlay) { overlay.classList.toggle('is-open', open); overlay.setAttribute('aria-hidden', String(!open)); }
-  if (toggle) { toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? 'Đóng menu' : 'Mở menu'); }
+  if (overlay) { overlay.classList.toggle('is-open', open); if (overlay.setAttribute) overlay.setAttribute('aria-hidden', String(!open)); }
+  if (toggle && toggle.setAttribute) { toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? 'Đóng menu' : 'Mở menu'); }
 }
 function toggleMobileMenu() { setMobileMenu(!document.body.classList.contains('mobile-menu-open')); }
 function closeMobileMenu() { setMobileMenu(false); }
@@ -161,17 +161,55 @@ function renderDecisionList(card) {
 
 function renderDecisionCard(card) {
   const actions = renderDecisionActions(card);
+  const missing = missingProposalFields(card);
+  const source = firstValue(card.source, card.sourceRef, card.sourceUrl, card.evidenceSource);
+  const evidenceDate = firstValue(card.evidenceDate, card.sourceDate, card.observedAt, card.createdAt);
+  const confidence = firstValue(card.confidence, card.evidenceConfidence, card.reliability);
+  const remaining = firstValue(card.missingEvidence, card.evidenceMissing, card.gaps);
 
   return `<article class="decision-card">
-    <div class="decision-head"><div><span class="eyebrow">${esc(card.gateLabel || '')}</span><h3>${esc(card.title || card.id)}</h3><p>${esc(card.subtitle || '')}</p></div><span class="badge warn">${esc(statusLabel(card.status))}</span></div>
-    <div class="decision-facts">
-      ${fact('Khách hàng', card.customer || 'CHƯA BIẾT')}
-      ${fact('Pain / phạm vi', card.problem || 'CHƯA CÓ DỮ LIỆU')}
-      ${fact('Bằng chứng', card.evidence || 'CHƯA CÓ')}
-      ${fact('Khuyến nghị', card.recommendation || 'MỞ HỒ SƠ')}
+    <div class="decision-head"><div><span class="eyebrow">GÓI ĐỀ XUẤT QUYẾT ĐỊNH</span><h3>${esc(userText(card.title || card.id))}</h3><p>${esc(userText(card.subtitle || card.problem || ''))}</p></div><span class="badge warn">${esc(statusLabel(card.status))}</span></div>
+    <div class="proposal-package">
+      ${proposalSection('Đề xuất xử lý', firstValue(card.recommendation, card.proposal, card.action, card.decisionAction), 'Chưa đủ cơ sở duyệt')}
+      ${proposalSection('Vì sao đáng làm', firstValue(card.reasons, card.whyNow, card.rationale, card.problem), 'Chưa đủ cơ sở duyệt')}
+      ${proposalSection('Ai bị ảnh hưởng', firstValue(card.affectedGroups, card.customer, card.targetCustomer, card.context), 'Chưa đủ cơ sở duyệt')}
+      ${proposalSection('Cơ hội cho Hà Tiên', firstValue(card.opportunities, card.haTienOpportunity, card.businessOpportunity), 'Chưa đủ cơ sở duyệt')}
+      <div class="proposal-section"><h4>Bằng chứng đang có</h4><ul><li>Nguồn: ${esc(userText(source || 'Chưa đủ cơ sở duyệt'))}</li><li>Ngày: ${esc(userText(evidenceDate || 'Chưa đủ cơ sở duyệt'))}</li><li>Độ tin cậy: ${esc(userText(confidence || 'Chưa đủ cơ sở duyệt'))}</li><li>Phần còn thiếu: ${esc(userText(remaining || (missing.length ? missing.join(', ') : 'Chưa ghi nhận')))}</li></ul></div>
+      <div class="proposal-section"><h4>Rủi ro cần chặn</h4><ul><li>Không diễn đạt Hà Tiên như đơn vị cấp chứng nhận pháp lý.</li><li>Không dùng nội dung pháp luật hoặc tiêu chuẩn khi chưa được kiểm chứng.</li><li>Không công bố nội dung nếu chưa qua rà soát.</li></ul></div>
+      ${proposalSection('Việc cần anh Hải quyết', firstValue(card.decisionQuestion, card.ownerQuestion, card.question), 'Chưa đủ cơ sở duyệt')}
+      ${proposalSection('Bước tiếp theo nếu đồng ý', firstValue(card.nextStep, card.nextSteps, card.followUp), 'Chưa đủ cơ sở duyệt')}
     </div>
+    ${missing.length ? `<p class="proposal-missing">Chưa đủ cơ sở duyệt — cần bổ sung: ${esc(missing.join(', '))}</p>` : ''}
     <div class="form-actions">${actions}</div>
   </article>`;
+}
+
+function firstValue(...values) { return values.find(value => value != null && value !== '' && !(Array.isArray(value) && value.length === 0)); }
+function asList(value) { return Array.isArray(value) ? value.filter(Boolean) : (value == null || value === '' ? [] : [value]); }
+function proposalSection(title, value, emptyLabel) {
+  const items = asList(value);
+  return `<div class="proposal-section"><h4>${esc(title)}</h4>${items.length ? `<ul>${items.map(item => `<li>${esc(userText(item))}</li>`).join('')}</ul>` : `<p class="proposal-empty">${esc(emptyLabel)} — cần bổ sung dữ liệu.</p>`}</div>`;
+}
+function missingProposalFields(card) {
+  const missing = [];
+  if (!firstValue(card.recommendation, card.proposal, card.action, card.decisionAction)) missing.push('đề xuất xử lý');
+  if (!firstValue(card.reasons, card.whyNow, card.rationale, card.problem)) missing.push('lý do đáng làm');
+  if (!firstValue(card.affectedGroups, card.customer, card.targetCustomer, card.context)) missing.push('nhóm bị ảnh hưởng');
+  if (!firstValue(card.opportunities, card.haTienOpportunity, card.businessOpportunity)) missing.push('cơ hội cho Hà Tiên');
+  if (!firstValue(card.evidence, card.source, card.sourceRef, card.sourceUrl, card.evidenceSource)) missing.push('nguồn bằng chứng');
+  if (!firstValue(card.decisionQuestion, card.ownerQuestion, card.question)) missing.push('câu hỏi cần anh Hải quyết');
+  if (!firstValue(card.nextStep, card.nextSteps, card.followUp)) missing.push('bước tiếp theo');
+  return missing;
+}
+function userText(value) {
+  return String(value == null ? '' : value)
+    .replace(/ACT_NOW_CONTINUE/g, 'TIẾP TỤC LÀM NGAY')
+    .replace(/School Kitchen Readiness\/Audit/gi, 'Mức độ sẵn sàng và rà soát bếp ăn trường học')
+    .replace(/\bdecision\b/gi, 'quyết định').replace(/\bevidence\b/gi, 'bằng chứng').replace(/\bpublic\b/gi, 'công bố')
+    .replace(/\bAI\b/g, 'trí tuệ nhân tạo').replace(/\bchecklist\b/gi, 'danh sách kiểm tra').replace(/\baudit\b/gi, 'rà soát hiện trạng')
+    .replace(/\breadiness\b/gi, 'mức độ sẵn sàng').replace(/\bworkflow\b/gi, 'quy trình').replace(/\bstatus\b/gi, 'trạng thái')
+    .replace(/\btask\b/gi, 'việc cần làm').replace(/\bclaim\b/gi, 'nội dung cần kiểm chứng').replace(/\bgate\b/gi, 'điều kiện chặn')
+    .replace(/\bbackend\b/gi, 'phần xử lý nền').replace(/\bfrontend\b/gi, 'phần giao diện');
 }
 
 function renderDecisionActions(card) {
