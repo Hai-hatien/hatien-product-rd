@@ -469,7 +469,7 @@ function renderLibrary() {
 
 function renderCandidate(card) {
   return `<article class="candidate-card">
-    <div><div class="candidate-meta"><span>${esc(card.origin === 'AI' ? 'AI đề xuất' : 'Yêu cầu nội bộ')}</span><span>${esc(statusLabel(card.stage || card.statusGroup))}</span></div>
+    <div><div class="candidate-meta"><span>${esc(card.origin === 'AI' ? 'Đề xuất tự động' : 'Yêu cầu nội bộ')}</span><span>${esc(statusLabel(card.stage || card.statusGroup))}</span></div>
     <h4>${esc(userText(card.title || card.candidateId))}</h4><p>${esc(userText(card.productScope || ''))} • ${esc(userText(card.customer || 'CHƯA BIẾT'))}</p>
     <div class="candidate-line"><b>Vấn đề:</b> ${esc(userText(card.pain || 'Chưa đủ cơ sở duyệt'))}</div>
     <div class="candidate-line"><b>Giá trị:</b> ${esc(userText(card.value || 'Chưa đủ cơ sở duyệt'))}</div></div>
@@ -750,7 +750,7 @@ function statusLabel(value) {
     WAITING_DEPENDENCY: 'Chờ phụ thuộc', BLOCKED: 'Bị chặn', HANDOFF_READY: 'Sẵn sàng bàn giao',
     PREREQUISITES_VERIFIED: 'Điều kiện đã xác minh', INSTALLED: 'Đã cài'
   };
-  return labels[raw] || raw.replace(/_/g, ' ');
+  return labels[raw] || userText(raw.replace(/_/g, ' '));
 }
 function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 function attr(value) { return String(value == null ? '' : value).replace(/[^a-zA-Z0-9_-]/g, '-'); }
