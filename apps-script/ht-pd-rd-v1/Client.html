@@ -473,13 +473,13 @@ function renderCandidate(card) {
     <h4>${esc(userText(card.title || card.candidateId))}</h4><p>${esc(userText(card.productScope || ''))} • ${esc(userText(card.customer || 'CHƯA BIẾT'))}</p>
     <div class="candidate-line"><b>Vấn đề:</b> ${esc(userText(card.pain || 'Chưa đủ cơ sở duyệt'))}</div>
     <div class="candidate-line"><b>Giá trị:</b> ${esc(userText(card.value || 'Chưa đủ cơ sở duyệt'))}</div></div>
-    <button class="button secondary" onclick='openArticleProposal(${JSON.stringify(card.candidateId || card.id || card.title)})'>Xem hồ sơ đề xuất</button>
+    <button class="button secondary" onclick='openArticleProposal(${JSON.stringify(card.candidateId || card.id || card.rdCaseId || card.title)})'>Xem hồ sơ đề xuất</button>
   </article>`;
 }
 
 function openArticleProposal(candidateId) {
   const cards = (appData && appData.candidateLibrary) || [];
-  const card = cards.find(item => String(item.candidateId || item.id || item.title || '') === String(candidateId));
+  const card = cards.find(item => String(item.candidateId || item.id || item.rdCaseId || item.title || '') === String(candidateId));
   const detail = document.getElementById('articleProposalDetail');
   if (!detail || !card) return showError(new Error('Không tìm thấy hồ sơ đề xuất trong dữ liệu hiện tại.'));
   const missing = missingArticleProposalFields(card);
